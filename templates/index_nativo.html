@@ -1,0 +1,644 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Sistema de Elevadores TJ/MG{% endblock %}
+
+{% block extra_head %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-building"></i> 
+            Sistema de Mapeamento de Elevadores - TJ/MG
+        </h1>
+    </div>
+</div>
+
+{% if erro %}
+    <div class="alert alert-danger" role="alert">
+        <i class="fas fa-exclamation-triangle"></i> {{ erro }}
+    </div>
+{% else %}
+    <!-- Cards de Estatísticas -->
+    <div class="row mb-4" id="stats-cards">
+        <div class="col-md-2">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <i class="fas fa-building fa-2x mb-2"></i>
+                    <h3 id="stat-predios">{{ stats.total_predios }}</h3>
+                    <p class="mb-0">Prédios</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-2">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <i class="fas fa-elevator fa-2x mb-2"></i>
+                    <h3 id="stat-elevadores">{{ stats.total_elevadores }}</h3>
+                    <p class="mb-0">Elevadores</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-2">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <i class="fas fa-map-marker-alt fa-2x mb-2"></i>
+                    <h3 id="stat-cidades">{{ stats.cidades }}</h3>
+                    <p class="mb-0">Cidades</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-2">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <i class="fas fa-map fa-2x mb-2"></i>
+                    <h3 id="stat-regioes">{{ stats.regioes }}</h3>
+                    <p class="mb-0">Regiões</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-2">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <i class="fas fa-check-circle fa-2x mb-2"></i>
+                    <h3 id="stat-ativos">{{ stats.em_atividade }}</h3>
+                    <p class="mb-0">Ativos</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-2">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <i class="fas fa-times-circle fa-2x mb-2"></i>
+                    <h3 id="stat-suspensos">{{ stats.suspensos }}</h3>
+                    <p class="mb-0">Suspensos</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mapa Nativo -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-map"></i> Mapa Interativo com Filtros</h5>
+                    <button class="btn btn-info btn-sm" onclick="atualizarDados()">
+                        <i class="fas fa-sync-alt"></i> Atualizar Dados
+                    </button>
+                </div>
+                <div class="card-body p-0" style="position: relative; height: 600px;">
+                    <!-- Container do mapa -->
+                    <div id="mapa" style="width: 100%; height: 100%;"></div>
+                    
+                    <!-- Filtros posicionados sobre o mapa -->
+                    <div id="filtros-container" style="
+                        position: absolute;
+                        top: 10px;
+                        left: 10px;
+                        background: white;
+                        padding: 15px;
+                        border-radius: 8px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        z-index: 1000;
+                        max-width: 300px;
+                        max-height: 550px;
+                        overflow-y: auto;
+                        font-family: Arial, sans-serif;
+                        font-size: 14px;
+                    ">
+                        <h5 style="margin: 0 0 15px 0; color: #333; text-align: center;">🔍 Filtros</h5>
+
+                        <!-- Contador -->
+                        <div id="contador-resultados" style="
+                            background: #e8f4fd;
+                            padding: 10px;
+                            border-radius: 6px;
+                            margin-bottom: 15px;
+                            text-align: center;
+                            font-weight: bold;
+                            color: #1976d2;
+                            border: 2px solid #bbdefb;
+                        ">
+                            <div>📊 <span id="total-elevadores-filtro">{{ stats.total_elevadores }}</span> elevadores</div>
+                            <div style="font-size: 12px; margin-top: 3px;">
+                                em <span id="total-locais-filtro">{{ stats.total_predios }}</span> locais
+                            </div>
+                        </div>
+
+                        <!-- Botões -->
+                        <div style="display: flex; gap: 5px; margin-bottom: 15px;">
+                            <button onclick="selecionarTodos()" style="
+                                flex: 1; padding: 6px; background: #4caf50; color: white;
+                                border: none; border-radius: 4px; cursor: pointer;
+                                font-size: 12px; font-weight: bold;
+                            ">✅ Todos</button>
+                            <button onclick="limparFiltros()" style="
+                                flex: 1; padding: 6px; background: #f44336; color: white;
+                                border: none; border-radius: 4px; cursor: pointer;
+                                font-size: 12px; font-weight: bold;
+                            ">🗑️ Limpar</button>
+                        </div>
+
+                        <!-- Filtro por Tipo -->
+                        <div style="margin-bottom: 15px; border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <label style="font-weight: bold; color: #555;">📋 Tipo</label>
+                                <button onclick="toggleCategoria('tipo')" style="background: none; border: none; font-size: 16px; cursor: pointer; color: #666;" id="toggle-tipo">➖</button>
+                            </div>
+                            <div id="filtros-tipo" style="max-height: 100px; overflow-y: auto;">
+                                {% for tipo in tipos_unicos %}
+                                <div style="margin: 5px 0; display: flex; align-items: center;">
+                                    <input type="checkbox" id="check-tipo-{{ loop.index }}" value="{{ tipo }}" 
+                                           onchange="aplicarFiltros()" style="margin-right: 8px;">
+                                    <label for="check-tipo-{{ loop.index }}" style="cursor: pointer; flex: 1; font-size: 13px;">
+                                        {{ tipo }}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Filtro por Região -->
+                        <div style="margin-bottom: 15px; border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <label style="font-weight: bold; color: #555;">🗺️ Região</label>
+                                <button onclick="toggleCategoria('regiao')" style="background: none; border: none; font-size: 16px; cursor: pointer; color: #666;" id="toggle-regiao">➖</button>
+                            </div>
+                            <div id="filtros-regiao" style="max-height: 100px; overflow-y: auto;">
+                                {% for regiao in regioes_unicas %}
+                                <div style="margin: 5px 0; display: flex; align-items: center;">
+                                    <input type="checkbox" id="check-regiao-{{ loop.index }}" value="{{ regiao }}" 
+                                           onchange="aplicarFiltros()" style="margin-right: 8px;">
+                                    <label for="check-regiao-{{ loop.index }}" style="cursor: pointer; flex: 1; font-size: 13px;">
+                                        {{ regiao }}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Filtro por Marca -->
+                        <div style="margin-bottom: 15px; border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <label style="font-weight: bold; color: #555;">🏭 Marca</label>
+                                <button onclick="toggleCategoria('marca')" style="background: none; border: none; font-size: 16px; cursor: pointer; color: #666;" id="toggle-marca">➖</button>
+                            </div>
+                            <div id="filtros-marca" style="max-height: 100px; overflow-y: auto;">
+                                {% for marca in marcas_unicas %}
+                                <div style="margin: 5px 0; display: flex; align-items: center;">
+                                    <input type="checkbox" id="check-marca-{{ loop.index }}" value="{{ marca }}" 
+                                           onchange="aplicarFiltros()" style="margin-right: 8px;">
+                                    <label for="check-marca-{{ loop.index }}" style="cursor: pointer; flex: 1; font-size: 13px;">
+                                        {{ marca }}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Filtro por Empresa -->
+                        {% if empresas_unicas %}
+                        <div style="margin-bottom: 15px; border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <label style="font-weight: bold; color: #555;">🏢 Empresa</label>
+                                <button onclick="toggleCategoria('empresa')" style="background: none; border: none; font-size: 16px; cursor: pointer; color: #666;" id="toggle-empresa">➖</button>
+                            </div>
+                            <div id="filtros-empresa" style="max-height: 100px; overflow-y: auto;">
+                                {% for empresa in empresas_unicas %}
+                                <div style="margin: 5px 0; display: flex; align-items: center;">
+                                    <input type="checkbox" id="check-empresa-{{ loop.index }}" value="{{ empresa }}" 
+                                           onchange="aplicarFiltros()" style="margin-right: 8px;">
+                                    <label for="check-empresa-{{ loop.index }}" style="cursor: pointer; flex: 1; font-size: 13px;">
+                                        {{ empresa }}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estatísticas Detalhadas -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-bar"></i> Estatísticas Detalhadas</h5>
+                </div>
+                <div class="card-body">
+                    <div id="loading-stats" class="text-center" style="display: none;">
+                        <i class="fas fa-spinner fa-spin"></i> Atualizando estatísticas...
+                    </div>
+                    <div id="stats-detalhadas">
+                        <p class="text-muted">Use os filtros no mapa para ver estatísticas específicas.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+// Dados para JavaScript
+const dadosOriginais = {{ geojson_data|safe }};
+let dadosFiltrados = dadosOriginais;
+let mapa = null;
+let layerGroup = null;
+
+console.log('🚀 Inicializando mapa nativo...');
+console.log('📊 Dados recebidos:', dadosOriginais);
+
+// Armazena valores originais dos stats
+window.statsOriginais = {
+    'stat-predios': {{ stats.total_predios }},
+    'stat-elevadores': {{ stats.total_elevadores }},
+    'stat-cidades': {{ stats.cidades }},
+    'stat-regioes': {{ stats.regioes }},
+    'stat-ativos': {{ stats.em_atividade }},
+    'stat-suspensos': {{ stats.suspensos }}
+};
+
+// Inicializa o mapa quando a página carrega
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📄 DOM carregado, criando mapa...');
+    
+    // Cria o mapa
+    mapa = L.map('mapa').setView([-19.92, -43.92], 6);
+    
+    // Adiciona tile layer
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap contributors, © CartoDB',
+        maxZoom: 19
+    }).addTo(mapa);
+    
+    // Cria grupo de camadas para os marcadores
+    layerGroup = L.layerGroup().addTo(mapa);
+    
+    console.log('✅ Mapa criado com sucesso!');
+    
+    // Adiciona marcadores iniciais
+    adicionarMarcadores(dadosOriginais);
+});
+
+// Função para adicionar marcadores
+function adicionarMarcadores(geojson) {
+    if (!geojson.features || !layerGroup) {
+        console.log('⚠️ Sem features ou layerGroup para adicionar');
+        return;
+    }
+    
+    console.log(`➕ Adicionando ${geojson.features.length} marcadores...`);
+    
+    geojson.features.forEach((feature, index) => {
+        const props = feature.properties;
+        const coords = feature.geometry.coordinates;
+        const latlng = [coords[1], coords[0]]; // Leaflet usa [lat, lng]
+        
+        // Define cor baseada no status
+        const status = props.status.toLowerCase();
+        let cor = '#6c757d';
+        if (status.includes('atividade')) cor = '#28a745';
+        else if (status.includes('suspenso')) cor = '#ded535';
+        
+        // Define tamanho baseado na quantidade
+        const radius = props.qtd_elev >= 5 ? 8 : (props.qtd_elev >= 3 ? 6 : 4);
+        
+        // Cria o marcador
+        const marker = L.circleMarker(latlng, {
+            radius: radius,
+            fillColor: cor,
+            color: cor,
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.8
+        });
+        
+        // Adiciona tooltip
+        marker.bindTooltip(
+            `${props.cidade} - ${props.tipo}<br/>
+            ${props.qtd_elev} elevadores - ${props.marcaLicitacao}<br/>
+            ${props.regiao} - ${props.status}`,
+            {sticky: true}
+        );
+        
+        // Adiciona popup
+        marker.bindPopup(
+            `<div style="font-family: Arial, sans-serif;">
+                <h4 style="margin: 0 0 10px 0; color: #333;">${props.unidade}</h4>
+                <p><strong>Cidade:</strong> ${props.cidade}</p>
+                <p><strong>Endereço:</strong> ${props.endereco}</p>
+                <p><strong>Tipo:</strong> ${props.tipo}</p>
+                <p><strong>Elevadores:</strong> ${props.qtd_elev}</p>
+                <p><strong>Paradas:</strong> ${props.paradas}</p>
+                <p><strong>Marca:</strong> ${props.marca}</p>
+                <p><strong>Empresa:</strong> ${props.empresa}</p>
+                <p><strong>Status:</strong> ${props.status}</p>
+            </div>`,
+            {maxWidth: 350}
+        );
+        
+        // Adiciona ao grupo de camadas
+        layerGroup.addLayer(marker);
+        
+        if (index < 3) {
+            console.log(`✅ Marcador ${index + 1} adicionado: ${props.unidade}`);
+        }
+    });
+    
+    console.log(`🎉 ${geojson.features.length} marcadores adicionados com sucesso!`);
+}
+
+// Função para obter valores selecionados
+function obterSelecionados(categoria) {
+    const checkboxes = document.querySelectorAll(`input[id^="check-${categoria}-"]:checked`);
+    const valores = Array.from(checkboxes).map(cb => cb.value);
+    console.log(`🔍 Filtros selecionados para ${categoria}:`, valores);
+    return valores;
+}
+
+// Função para aplicar filtros
+function aplicarFiltros() {
+    console.log('🎯 ========== APLICANDO FILTROS ==========');
+    
+    const tiposSelecionados = obterSelecionados('tipo');
+    const regioesSelecionadas = obterSelecionados('regiao');
+    const marcasSelecionadas = obterSelecionados('marca');
+    const empresasSelecionadas = obterSelecionados('empresa');
+
+    console.log('📋 Resumo dos filtros:', {
+        tipos: tiposSelecionados,
+        regioes: regioesSelecionadas,
+        marcas: marcasSelecionadas,
+        empresas: empresasSelecionadas
+    });
+
+    if (!dadosOriginais || !dadosOriginais.features) {
+        console.error('❌ Dados originais não disponíveis');
+        return;
+    }
+
+    // Filtra os dados
+    const featuresOriginal = dadosOriginais.features.length;
+    
+    dadosFiltrados = {
+        ...dadosOriginais,
+        features: dadosOriginais.features.filter(feature => {
+            const props = feature.properties;
+            
+            const passaTipo = tiposSelecionados.length === 0 || tiposSelecionados.includes(props.tipo);
+            const passaRegiao = regioesSelecionadas.length === 0 || regioesSelecionadas.includes(props.regiao);
+            const passaMarca = marcasSelecionadas.length === 0 || marcasSelecionadas.includes(props.marcaLicitacao);
+            const passaEmpresa = empresasSelecionadas.length === 0 || empresasSelecionadas.includes(props.empresa);
+            
+            return passaTipo && passaRegiao && passaMarca && passaEmpresa;
+        })
+    };
+
+    const featuresFiltradas = dadosFiltrados.features.length;
+    console.log(`📊 Filtragem concluída: ${featuresOriginal} → ${featuresFiltradas} features`);
+
+    // Atualiza o mapa
+    atualizarMapa();
+    
+    // Atualiza contador
+    atualizarContadorFiltros();
+    
+    // Atualiza estatísticas
+    atualizarEstatisticasDashboard();
+    
+    console.log('✅ ========== FILTROS APLICADOS ==========');
+}
+
+// Função para atualizar o mapa
+function atualizarMapa() {
+    console.log('🗺️ ========== ATUALIZANDO MAPA ==========');
+    
+    if (!layerGroup) {
+        console.error('❌ LayerGroup não disponível');
+        return;
+    }
+
+    // Limpa todos os marcadores
+    layerGroup.clearLayers();
+    console.log('🧹 Marcadores removidos');
+
+    // Adiciona novos marcadores filtrados
+    adicionarMarcadores(dadosFiltrados);
+    
+    console.log('✅ ========== MAPA ATUALIZADO ==========');
+}
+
+// Função para atualizar contador
+function atualizarContadorFiltros() {
+    if (!dadosFiltrados.features) return;
+    
+    const totalElevadores = dadosFiltrados.features.reduce((total, feature) => {
+        return total + feature.properties.qtd_elev;
+    }, 0);
+
+    const totalLocais = dadosFiltrados.features.length;
+
+    const elemElevadores = document.getElementById('total-elevadores-filtro');
+    const elemLocais = document.getElementById('total-locais-filtro');
+    
+    if (elemElevadores) elemElevadores.textContent = totalElevadores;
+    if (elemLocais) elemLocais.textContent = totalLocais;
+
+    const contadorElement = document.getElementById('contador-resultados');
+    if (contadorElement) {
+        if (totalElevadores === 0) {
+            contadorElement.style.background = '#ffebee';
+            contadorElement.style.color = '#c62828';
+            contadorElement.style.borderColor = '#ef9a9a';
+        } else {
+            contadorElement.style.background = '#e8f5e8';
+            contadorElement.style.color = '#2e7d32';
+            contadorElement.style.borderColor = '#a5d6a7';
+        }
+    }
+    
+    console.log(`�� Contador atualizado: ${totalElevadores} elevadores em ${totalLocais} locais`);
+}
+
+// Função para atualizar estatísticas da dashboard
+function atualizarEstatisticasDashboard() {
+    const tiposSelecionados = obterSelecionados('tipo');
+    const regioesSelecionadas = obterSelecionados('regiao');
+    const marcasSelecionadas = obterSelecionados('marca');
+    const empresasSelecionadas = obterSelecionados('empresa');
+
+    // Se nenhum filtro ativo, limpa todos os filtros
+    if (tiposSelecionados.length === 0 && regioesSelecionadas.length === 0 && 
+        marcasSelecionadas.length === 0 && empresasSelecionadas.length === 0) {
+        console.log('⏭️ Nenhum filtro ativo, limpando todos os filtros');
+        limparFiltros();
+        return;
+    }
+
+    // Monta parâmetros
+    const params = new URLSearchParams();
+    tiposSelecionados.forEach(tipo => params.append('tipo', tipo));
+    regioesSelecionadas.forEach(regiao => params.append('regiao', regiao));
+    marcasSelecionadas.forEach(marca => params.append('marca', marca));
+    empresasSelecionadas.forEach(empresa => params.append('empresa', empresa));
+
+    console.log('📡 Fazendo requisição para API...');
+
+    // Mostra loading
+    const loadingElement = document.getElementById('loading-stats');
+    if (loadingElement) loadingElement.style.display = 'block';
+
+    // Faz requisição
+    fetch('/api/filtrar?' + params.toString())
+        .then(response => response.json())
+        .then(data => {
+            if (loadingElement) loadingElement.style.display = 'none';
+            
+            console.log('📡 Resposta da API:', data);
+            
+            if (data.success) {
+                // Atualiza cards
+                const elementos = {
+                    'stat-predios': data.stats.total_predios,
+                    'stat-elevadores': data.stats.total_elevadores,
+                    'stat-cidades': data.stats.cidades,
+                    'stat-regioes': data.stats.regioes,
+                    'stat-ativos': data.stats.em_atividade,
+                    'stat-suspensos': data.stats.suspensos
+                };
+                
+                for (let id in elementos) {
+                    const elem = document.getElementById(id);
+                    if (elem) {
+                        elem.textContent = elementos[id];
+                        console.log(`📊 Card ${id} atualizado para:`, elementos[id]);
+                    }
+                }
+
+                // Atualiza estatísticas detalhadas
+                mostrarEstatisticasDetalhadas(data.stats);
+            }
+        })
+        .catch(error => {
+            if (loadingElement) loadingElement.style.display = 'none';
+            console.error('❌ Erro ao carregar estatísticas:', error);
+        });
+}
+
+// Função para mostrar estatísticas detalhadas
+function mostrarEstatisticasDetalhadas(stats) {
+    const container = document.getElementById('stats-detalhadas');
+    if (!container) return;
+    
+    let html = '<div class="row">';
+    
+    const categorias = [
+        {titulo: 'Por Tipo', dados: stats.por_tipo},
+        {titulo: 'Por Região', dados: stats.por_regiao},
+        {titulo: 'Por Marca', dados: stats.por_marca},
+        {titulo: 'Por Status', dados: stats.por_status}
+    ];
+    
+    categorias.forEach(categoria => {
+        html += `<div class="col-md-3"><h6>${categoria.titulo}</h6><ul class="list-unstyled">`;
+        for (let [key, value] of Object.entries(categoria.dados)) {
+            html += `<li><strong>${key}:</strong> ${value}</li>`;
+        }
+        html += '</ul></div>';
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// Funções auxiliares
+function limparFiltros() {
+    console.log('🧹 Limpando todos os filtros...');
+    
+    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = false);
+    
+    dadosFiltrados = dadosOriginais;
+    atualizarMapa();
+    atualizarContadorFiltros();
+    
+    // Restaura valores originais dos cards
+    const valoresOriginais = window.statsOriginais || {};
+    for (let id in valoresOriginais) {
+        const elem = document.getElementById(id);
+        if (elem) elem.textContent = valoresOriginais[id];
+    }
+    
+    const statsContainer = document.getElementById('stats-detalhadas');
+    if (statsContainer) {
+        statsContainer.innerHTML = '<p class="text-muted">Use os filtros no mapa para ver estatísticas específicas.</p>';
+    }
+    
+    console.log('✅ Filtros limpos');
+}
+
+function selecionarTodos() {
+    console.log('✅ Selecionando todos os filtros...');
+    
+    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = true);
+    aplicarFiltros();
+}
+
+function toggleCategoria(categoria) {
+    const div = document.getElementById(`filtros-${categoria}`);
+    const button = document.getElementById(`toggle-${categoria}`);
+
+    if (div && button) {
+        if (div.style.display === 'none') {
+            div.style.display = 'block';
+            button.textContent = '➖';
+        } else {
+            div.style.display = 'none';
+            button.textContent = '➕';
+        }
+    }
+}
+
+function atualizarDados() {
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Atualizando...';
+    btn.disabled = true;
+    
+    fetch('/atualizar')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Dados atualizados!\n' + data.message);
+                location.reload();
+            } else {
+                alert('Erro: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Erro na requisição');
+        })
+        .finally(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
+}
+</script>
+{% endblock %}
