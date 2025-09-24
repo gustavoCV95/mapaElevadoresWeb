@@ -530,6 +530,12 @@ function atualizarEstatisticasDashboard() {
                         console.log(`📊 Card ${id} atualizado para:`, elementos[id]);
                     }
                 }
+                // ✅ Sincroniza contador dos filtros com os mesmos valores da API
+                const elemLocaisFiltro = document.getElementById('total-locais-filtro');
+                const elemElevadoresFiltro = document.getElementById('total-elevadores-filtro');
+
+                if (elemLocaisFiltro) elemLocaisFiltro.textContent = data.stats.total_predios;
+                if (elemElevadoresFiltro) elemElevadoresFiltro.textContent = data.stats.total_elevadores;
 
                 // Atualiza estatísticas detalhadas
                 mostrarEstatisticasDetalhadas(data.stats);
@@ -585,6 +591,13 @@ function limparFiltros() {
         if (elem) elem.textContent = valoresOriginais[id];
     }
     
+    // ✅ Sincroniza contador de filtros com valores originais
+    const elemLocaisFiltro = document.getElementById('total-locais-filtro');
+    const elemElevadoresFiltro = document.getElementById('total-elevadores-filtro');
+
+    if (elemLocaisFiltro) elemLocaisFiltro.textContent = valoresOriginais['stat-predios'];
+    if (elemElevadoresFiltro) elemElevadoresFiltro.textContent = valoresOriginais['stat-elevadores'];
+
     const statsContainer = document.getElementById('stats-detalhadas');
     if (statsContainer) {
         statsContainer.innerHTML = '<p class="text-muted">Use os filtros no mapa para ver estatísticas específicas.</p>';
