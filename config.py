@@ -7,7 +7,8 @@ load_dotenv()
 
 class Config:
     # URL da planilha do Google Sheets
-    PLANILHA_URL = 'https://docs.google.com/spreadsheets/d/1I46gVcTqvE9JjHIrbeqZhNLvvd4OZbGb7iTVkcHAhf0/edit?gid=0#gid=0'
+    PLANILHA_ELEVADORES_URL = 'https://docs.google.com/spreadsheets/d/1I46gVcTqvE9JjHIrbeqZhNLvvd4OZbGb7iTVkcHAhf0/edit?gid=0#gid=0'
+    PLANILHA_MANUTENCAO_URL = 'https://docs.google.com/spreadsheets/d/1XxW_lZipATG-06ku7ZPyw34bPE93E-iTEDNVAiVeSf4/edit?gid=1630268405#gid=1630268405'
     
     # Configurações de cache (em segundos)
     CACHE_TIMEOUT = 300  # 5 minutos

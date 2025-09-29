@@ -18,43 +18,64 @@
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
+            <!-- Brand -->
             <a class="navbar-brand" href="{{ url_for('index') }}">
                 <i class="fas fa-building"></i> TJ/MG - Elevadores
             </a>
             
-            <div class="navbar-nav ms-auto d-flex align-items-center">
-                <a class="nav-link" href="{{ url_for('index') }}">
-                    <i class="fas fa-home"></i> Dashboard
-                </a>
-                <button class="btn btn-outline-light btn-sm ms-2" onclick="atualizarDados()">
-                    <i class="fas fa-sync-alt"></i> Atualizar
-                </button>
+            <!-- 🆕 BOTÃO TOGGLE PARA MOBILE -->
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <!-- 🆕 ESTRUTURA CORRETA DO NAVBAR -->
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <!-- Links de navegação -->
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="fas fa-home"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('kpis_manutencao') }}">
+                            <i class="fas fa-wrench"></i> KPIs Manutenção
+                        </a>
+                    </li>
+                </ul>
                 
-                <!-- Informações do usuário logado -->
-                {% if usuario_logado %}
-                <div class="nav-item dropdown ms-3">
-                    <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-user-circle me-2"></i>
-                        <span>{{ usuario_logado }}</span>
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li>
-                            <span class="dropdown-item-text">
-                                <small class="text-muted">
-                                    <i class="fas fa-clock"></i> 
-                                    Logado desde {{ login_timestamp[:19] if login_timestamp else 'N/A' }}
-                                </small>
-                            </span>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <a class="dropdown-item text-danger" href="{{ url_for('logout') }}">
-                                <i class="fas fa-sign-out-alt"></i> Sair
-                            </a>
-                        </li>
-                    </ul>
+                <!-- Botões e usuário à direita -->
+                <div class="d-flex align-items-center">
+                    <button class="btn btn-outline-light btn-sm me-3" onclick="atualizarDados()">
+                        <i class="fas fa-sync-alt"></i> Atualizar
+                    </button>
+                    
+                    <!-- Informações do usuário logado -->
+                    {% if usuario_logado %}
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-circle me-2"></i>
+                            <span>{{ usuario_logado }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <span class="dropdown-item-text">
+                                    <small class="text-muted">
+                                        <i class="fas fa-clock"></i> 
+                                        Logado desde {{ login_timestamp[:19] if login_timestamp else 'N/A' }}
+                                    </small>
+                                </span>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item text-danger" href="{{ url_for('logout') }}">
+                                    <i class="fas fa-sign-out-alt"></i> Sair
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    {% endif %}
                 </div>
-                {% endif %}
             </div>
         </div>
     </nav>

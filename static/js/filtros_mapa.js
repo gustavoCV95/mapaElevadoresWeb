@@ -228,7 +228,7 @@
         return valores;
     }
 
-    // Função para aplicar filtros - COM DEBUG
+    // Função para aplicar filtros - COM SITUAÇÃO
     function aplicarFiltros() {
         console.log('🎯 ========== APLICANDO FILTROS ==========');
         
@@ -236,12 +236,14 @@
         const regioesSelecionadas = obterSelecionados('regiao');
         const marcasSelecionadas = obterSelecionados('marca');
         const empresasSelecionadas = obterSelecionados('empresa');
+        const situacoesSelecionadas = obterSelecionados('situacao'); // 🆕 NOVO FILTRO
 
         console.log('📋 Resumo dos filtros:', {
             tipos: tiposSelecionados,
             regioes: regioesSelecionadas,
             marcas: marcasSelecionadas,
-            empresas: empresasSelecionadas
+            empresas: empresasSelecionadas,
+            situacoes: situacoesSelecionadas // 🆕 NOVO
         });
 
         if (!dadosOriginais || !dadosOriginais.features) {
@@ -251,7 +253,6 @@
 
         // Filtra os dados
         const featuresOriginal = dadosOriginais.features.length;
-        console.log(`📊 Dados originais: ${featuresOriginal} features`);
         
         dadosFiltrados = {
             ...dadosOriginais,
@@ -263,20 +264,39 @@
                 const passaMarca = marcasSelecionadas.length === 0 || marcasSelecionadas.includes(props.marcaLicitacao);
                 const passaEmpresa = empresasSelecionadas.length === 0 || empresasSelecionadas.includes(props.empresa);
                 
-                return passaTipo && passaRegiao && passaMarca && passaEmpresa;
+                // 🆕 NOVA LÓGICA DE FILTRO POR SITUAÇÃO
+                let passaSituacao = true;
+                if (situacoesSelecionadas.length > 0) {
+                    passaSituacao = false;
+                    
+                    // Verifica cada situação selecionada
+                    situacoesSelecionadas.forEach(situacao => {
+                        if (situacao === 'ativos') {
+                            // Ativos: status ativo E sem elevadores parados
+                            if (props.status && props.status.toLowerCase().includes('atividade') && 
+                                (!props.nElevadorParado || props.nElevadorParado === 0)) {
+                                passaSituacao = true;
+                            }
+                        } else if (situacao === 'suspensos') {
+                            // Suspensos: status suspenso
+                            if (props.status && props.status.toLowerCase().includes('suspenso')) {
+                                passaSituacao = true;
+                            }
+                        } else if (situacao === 'parados') {
+                            // Parados: tem elevadores parados
+                            if (props.nElevadorParado && props.nElevadorParado > 0) {
+                                passaSituacao = true;
+                            }
+                        }
+                    });
+                }
+                
+                return passaTipo && passaRegiao && passaMarca && passaEmpresa && passaSituacao;
             })
         };
 
         const featuresFiltradas = dadosFiltrados.features.length;
-        
-        // DEBUG: Calcula totais do frontend
-        const totalElevadoresFrontend = dadosFiltrados.features.reduce((total, feature) => {
-            return total + feature.properties.qtd_elev;
-        }, 0);
-        
-        console.log(`📊 FRONTEND - Filtragem: ${featuresOriginal} → ${featuresFiltradas} features`);
-        console.log(`📊 FRONTEND - Total elevadores: ${totalElevadoresFrontend}`);
-        console.log(`📊 FRONTEND - Total locais: ${featuresFiltradas}`);
+        console.log(`📊 Filtragem concluída: ${featuresOriginal} → ${featuresFiltradas} features`);
 
         // Atualiza o mapa
         atualizarMapa();
@@ -289,61 +309,6 @@
         
         console.log('✅ ========== FILTROS APLICADOS ==========');
     }
-    // Função para atualizar o mapa
-    function atualizarMapa() {
-        console.log('🗺️ ========== ATUALIZANDO MAPA ==========');
-        
-        if (!mapaLeaflet) {
-            console.error('❌ Mapa Leaflet não disponível, usando fallback...');
-            if (window.atualizarMapaFallback) {
-                window.atualizarMapaFallback();
-            }
-            return;
-        }
-
-        // Remove marcadores existentes
-        console.log('🧹 Removendo marcadores existentes...');
-        
-        let marcadoresRemovidos = 0;
-        marcadoresOriginais.forEach(layer => {
-            if (mapaLeaflet.hasLayer(layer)) {
-                mapaLeaflet.removeLayer(layer);
-                marcadoresRemovidos++;
-            }
-        });
-        
-        console.log(`🗑️ ${marcadoresRemovidos} marcadores removidos`);
-
-        // Remove todas as camadas não-tile como backup
-        mapaLeaflet.eachLayer(function(layer) {
-            if (!layer._url && !layer.options.attribution) {
-                mapaLeaflet.removeLayer(layer);
-            }
-        });
-
-        // Adiciona novos marcadores
-        if (dadosFiltrados.features && dadosFiltrados.features.length > 0) {
-            console.log(`➕ Adicionando ${dadosFiltrados.features.length} novos marcadores...`);
-            
-            marcadoresOriginais = [];
-            
-            dadosFiltrados.features.forEach((feature, index) => {
-                const marker = criarMarcador(feature);
-                marker.addTo(mapaLeaflet);
-                marcadoresOriginais.push(marker);
-                
-                if (index < 3) {
-                    console.log(`➕ Marcador ${index + 1} adicionado:`, feature.properties.unidade);
-                }
-            });
-            
-            console.log(`✅ ${dadosFiltrados.features.length} marcadores adicionados com sucesso`);
-        } else {
-            console.log('⚠️ Nenhum marcador para exibir (dados filtrados vazios)');
-        }
-        
-        console.log('✅ ========== MAPA ATUALIZADO ==========');
-    }
 
     // Função para criar um marcador
     function criarMarcador(feature) {
@@ -351,11 +316,16 @@
         const coords = feature.geometry.coordinates;
         const latlng = [coords[1], coords[0]]; // Leaflet usa [lat, lng]
         
-        // Define cor baseada no status
-        const status = props.status.toLowerCase();
-        let cor = '#6c757d';
-        if (status.includes('atividade')) cor = '#28a745';
-        else if (status.includes('suspenso')) cor = '#dc3545';
+        // 🎨 NOVA LÓGICA DE CORES - PRIORIDADE: Parados > Suspensos > Ativos
+        let cor = '#6c757d'; // Cinza padrão
+        
+        if (props.temElevadorParado || (props.nElevadorParado && props.nElevadorParado > 0)) {
+            cor = '#dc3545'; // 🔴 Vermelho para elevadores parados
+        } else if (props.status && props.status.toLowerCase().includes('suspenso')) {
+            cor = '#ffc107'; // 🟡 Amarelo para suspensos (CORRIGIDO)
+        } else if (props.status && props.status.toLowerCase().includes('atividade')) {
+            cor = '#28a745'; // 🟢 Verde para ativos
+        }
         
         // Define tamanho baseado na quantidade
         const radius = props.qtd_elev >= 5 ? 10 : (props.qtd_elev >= 3 ? 8 : 6);
@@ -370,17 +340,19 @@
             fillOpacity: 0.8
         });
         
-        // Adiciona tooltip
-        marker.bindTooltip(
-            `${props.cidade} - ${props.tipo}<br/>
+        // 📝 TOOLTIP ATUALIZADO
+        let tooltipText = `${props.cidade} - ${props.tipo}<br/>
             ${props.qtd_elev} elevadores - ${props.marcaLicitacao}<br/>
-            ${props.regiao} - ${props.status}`,
-            {sticky: true}
-        );
+            ${props.regiao} - ${props.status}`;
         
-        // Adiciona popup
-        marker.bindPopup(
-            `<div style="font-family: Arial, sans-serif;">
+        if (props.nElevadorParado && props.nElevadorParado > 0) {
+            tooltipText += `<br/><strong style="color: #dc3545;">⚠️ ${props.nElevadorParado} parado(s)</strong>`;
+        }
+
+        marker.bindTooltip(tooltipText, {sticky: true});
+        
+        // 📝 POPUP ATUALIZADO
+        let popupContent = `<div style="font-family: Arial, sans-serif;">
                 <h4 style="margin: 0 0 10px 0; color: #333;">${props.unidade}</h4>
                 <p><strong>Cidade:</strong> ${props.cidade}</p>
                 <p><strong>Endereço:</strong> ${props.endereco}</p>
@@ -389,10 +361,28 @@
                 <p><strong>Paradas:</strong> ${props.paradas}</p>
                 <p><strong>Marca:</strong> ${props.marca}</p>
                 <p><strong>Empresa:</strong> ${props.empresa}</p>
-                <p><strong>Status:</strong> ${props.status}</p>
-            </div>`,
-            {maxWidth: 350}
-        );
+                <p><strong>Status:</strong> ${props.status}</p>`;
+        
+        // 🆕 ADICIONA INFORMAÇÕES DE ELEVADORES PARADOS E SUSPENSOS
+        
+        if ((props.nElevadorParado && props.nElevadorParado > 0)) {
+            popupContent += `
+                <hr style="margin: 10px 0;">
+                <p style="color: #dc3545;"><strong>⚠️ Elevadores Parados:</strong> ${props.nElevadorParado}</p>`;
+        }
+        if ((props.nElevadorParado && props.nElevadorParado > 0) || props.status && props.status.toLowerCase().includes('suspenso')) {    
+            if (props.dataDeParada) {
+                popupContent += `<p style="color: #dc3545;"><strong>📅 Data da Parada:</strong> ${props.dataDeParada}</p>`;
+            }
+            
+            if (props.previsaoDeRetorno) {
+                popupContent += `<p style="color: #dc3545;"><strong>🔄 Previsão de Retorno:</strong> ${props.previsaoDeRetorno}</p>`;
+            }
+        }
+        
+        popupContent += '</div>';
+        
+        marker.bindPopup(popupContent, {maxWidth: 350});
         
         return marker;
     }
@@ -429,17 +419,20 @@
         console.log(`📊 Contador atualizado: ${totalElevadores} elevadores em ${totalLocais} locais`);
     }
 
-    // Função para atualizar estatísticas da dashboard
+    // Função para atualizar estatísticas da dashboard - COM SITUAÇÃO
     function atualizarEstatisticasDashboard() {
         const tiposSelecionados = obterSelecionados('tipo');
         const regioesSelecionadas = obterSelecionados('regiao');
         const marcasSelecionadas = obterSelecionados('marca');
         const empresasSelecionadas = obterSelecionados('empresa');
+        const situacoesSelecionadas = obterSelecionados('situacao'); // 🆕 NOVO
 
-        // Se nenhum filtro ativo, não faz requisição
+        // Se nenhum filtro ativo, limpa todos os filtros
         if (tiposSelecionados.length === 0 && regioesSelecionadas.length === 0 && 
-            marcasSelecionadas.length === 0 && empresasSelecionadas.length === 0) {
-            console.log('⏭️ Nenhum filtro ativo, pulando atualização de estatísticas');
+            marcasSelecionadas.length === 0 && empresasSelecionadas.length === 0 &&
+            situacoesSelecionadas.length === 0) { // 🆕 INCLUIR NOVO FILTRO
+            console.log('⏭️ Nenhum filtro ativo, limpando todos os filtros');
+            limparFiltros();
             return;
         }
 
@@ -449,6 +442,7 @@
         regioesSelecionadas.forEach(regiao => params.append('regiao', regiao));
         marcasSelecionadas.forEach(marca => params.append('marca', marca));
         empresasSelecionadas.forEach(empresa => params.append('empresa', empresa));
+        situacoesSelecionadas.forEach(situacao => params.append('situacao', situacao)); // 🆕 NOVO
 
         console.log('📡 Fazendo requisição para API...');
 
@@ -472,7 +466,8 @@
                         'stat-cidades': data.stats.cidades,
                         'stat-regioes': data.stats.regioes,
                         'stat-ativos': data.stats.em_atividade,
-                        'stat-suspensos': data.stats.suspensos
+                        'stat-suspensos': data.stats.suspensos,
+                        'stat-parados': data.stats.elevadores_parados
                     };
                     
                     for (let id in elementos) {

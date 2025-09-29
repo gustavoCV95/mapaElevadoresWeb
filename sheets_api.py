@@ -79,6 +79,37 @@ class SheetsAPI:
         except Exception as e:
             print(f"❌ Erro inesperado: {e}")
             return pd.DataFrame()
+        
+    def obter_dados_manutencao(self, planilha_url):
+        """Obtém dados de manutenção da planilha específica"""
+        try:
+            print(f"🔧 Acessando planilha de manutenção: {planilha_url}")
+            
+            # Abre a planilha pela URL
+            sheet = self.client.open_by_url(planilha_url)
+            print(f"📋 Planilha de manutenção aberta: {sheet.title}")
+            
+            # Lista as abas disponíveis
+            worksheets = sheet.worksheets()
+            print(f"📑 Abas encontradas: {[w.title for w in worksheets]}")
+            
+            # Pega a primeira aba (ou específica se necessário)
+            worksheet = worksheets[0]
+            print(f"📄 Usando aba: {worksheet.title}")
+            
+            # Obtém os dados
+            dados = worksheet.get_all_records()
+            print(f"�� Registros de manutenção encontrados: {len(dados)}")
+            
+            if len(dados) > 0:
+                print(f"🔍 Colunas manutenção: {list(dados[0].keys())}")
+            
+            df = pd.DataFrame(dados)
+            return df
+            
+        except Exception as e:
+            print(f"❌ Erro ao obter dados de manutenção: {e}")
+            return pd.DataFrame()
 
 # Teste da conexão
 if __name__ == "__main__":
@@ -92,13 +123,14 @@ if __name__ == "__main__":
             print("\n" + "="*50)
             print("✅ Conexão com Google Sheets funcionando!")
             print("="*50)
-            
+
             # Agora testa com sua planilha específica
             url_planilha = input("\n📝 Cole a URL da sua planilha aqui: ").strip()
             
             if url_planilha and url_planilha != "SUA_URL_DA_PLANILHA_AQUI":
                 print(f"\n🔄 Testando acesso à planilha...")
-                dados = api.obter_dados_elevadores(url_planilha)
+                dados = api.obter_dados_manutencao(url_planilha)
+                #dados = api.obter_dados_elevadores(url_planilha)
                 
                 if not dados.empty:
                     print(f"\n🎉 SUCESSO! Dados carregados:")

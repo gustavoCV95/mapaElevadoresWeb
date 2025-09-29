@@ -23,7 +23,7 @@
     </div>
 {% else %}
     <!-- Cards de Estatísticas -->
-    <div class="row mb-4" id="stats-cards">
+    <div class="row mb-4 stats-row" id="stats-cards">
         <div class="col-md-2">
             <div class="card bg-primary text-white">
                 <div class="card-body text-center">
@@ -55,7 +55,7 @@
         </div>
         
         <div class="col-md-2">
-            <div class="card bg-warning text-white">
+            <div class="card bg-secondary text-white">
                 <div class="card-body text-center">
                     <i class="fas fa-map fa-2x mb-2"></i>
                     <h3 id="stat-regioes">{{ stats.regioes }}</h3>
@@ -75,12 +75,22 @@
         </div>
         
         <div class="col-md-2">
-            <div class="card bg-danger text-white">
+            <div class="card bg-warning text-white">
                 <div class="card-body text-center">
                     <i class="fas fa-times-circle fa-2x mb-2"></i>
                     <h3 id="stat-suspensos">{{ stats.suspensos }}</h3>
                     <p class="mb-0">Suspensos</p>
                 </div>
+            </div>
+        </div>
+
+        <div class="col-md-2">
+            <div class="card bg-danger text-white">
+                 <div class="card-body text-center">
+                    <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                     <h3 id="stat-parados">{{ stats.elevadores_parados }}</h3>
+                     <p class="mb-0">Parados</p>
+                 </div>
             </div>
         </div>
     </div>
@@ -225,6 +235,36 @@
                             </div>
                         </div>
                         {% endif %}
+                        <!-- Filtro por Situação -->
+                        <div style="margin-bottom: 15px; border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <label style="font-weight: bold; color: #555;">⚡ Situação</label>
+                                <button onclick="toggleCategoria('situacao')" style="background: none; border: none; font-size: 16px; cursor: pointer; color: #666;" id="toggle-situacao">➖</button>
+                            </div>
+                            <div id="filtros-situacao" style="max-height: 100px; overflow-y: auto;">
+                                <div style="margin: 5px 0; display: flex; align-items: center;">
+                                    <input type="checkbox" id="check-situacao-1" value="ativos" 
+                                           onchange="aplicarFiltros()" style="margin-right: 8px;">
+                                    <label for="check-situacao-1" style="cursor: pointer; flex: 1; font-size: 13px;">
+                                        🟢 Elevadores Ativos
+                                    </label>
+                                </div>
+                                <div style="margin: 5px 0; display: flex; align-items: center;">
+                                    <input type="checkbox" id="check-situacao-2" value="suspensos" 
+                                           onchange="aplicarFiltros()" style="margin-right: 8px;">
+                                    <label for="check-situacao-2" style="cursor: pointer; flex: 1; font-size: 13px;">
+                                        🟡 Elevadores Suspensos
+                                    </label>
+                                </div>
+                                <div style="margin: 5px 0; display: flex; align-items: center;">
+                                    <input type="checkbox" id="check-situacao-3" value="parados" 
+                                           onchange="aplicarFiltros()" style="margin-right: 8px;">
+                                    <label for="check-situacao-3" style="cursor: pointer; flex: 1; font-size: 13px;">
+                                        🔴 Elevadores Parados
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -244,6 +284,29 @@
                     </div>
                     <div id="stats-detalhadas">
                         <p class="text-muted">Use os filtros no mapa para ver estatísticas específicas.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Elevadores Parados -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-exclamation-triangle text-danger"></i> Elevadores Parados</h5>
+                    <span id="badge-total-parados" class="badge bg-danger">0</span>
+                </div>
+                <div class="card-body">
+                    <div id="loading-elevadores-parados" class="text-center" style="display: none;">
+                        <i class="fas fa-spinner fa-spin"></i> Carregando elevadores parados...
+                    </div>
+                    <div id="lista-elevadores-parados">
+                        <p class="text-muted text-center">
+                            <i class="fas fa-info-circle"></i> 
+                            Use os filtros no mapa para ver elevadores parados específicos ou carregue a página para ver todos.
+                        </p>
                     </div>
                 </div>
             </div>
@@ -271,7 +334,8 @@ window.statsOriginais = {
     'stat-cidades': {{ stats.cidades }},
     'stat-regioes': {{ stats.regioes }},
     'stat-ativos': {{ stats.em_atividade }},
-    'stat-suspensos': {{ stats.suspensos }}
+    'stat-suspensos': {{ stats.suspensos }},
+    'stat-parados': {{ stats.elevadores_parados }}
 };
 
 // Inicializa o mapa quando a página carrega
@@ -294,6 +358,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Adiciona marcadores iniciais
     adicionarMarcadores(dadosOriginais);
+    carregarElevadoresParadosIniciais();
 });
 
 // Função para adicionar marcadores
@@ -310,11 +375,16 @@ function adicionarMarcadores(geojson) {
         const coords = feature.geometry.coordinates;
         const latlng = [coords[1], coords[0]]; // Leaflet usa [lat, lng]
         
-        // Define cor baseada no status
-        const status = props.status.toLowerCase();
-        let cor = '#6c757d';
-        if (status.includes('atividade')) cor = '#28a745';
-        else if (status.includes('suspenso')) cor = '#ded535';
+        // 🎨 NOVA LÓGICA DE CORES - PRIORIDADE: Parados > Suspensos > Ativos
+        let cor = '#6c757d'; // Cinza padrão
+        
+        if (props.temElevadorParado || (props.nElevadorParado && props.nElevadorParado > 0)) {
+            cor = '#dc3545'; // 🔴 Vermelho para elevadores parados
+        } else if (props.status && props.status.toLowerCase().includes('suspenso')) {
+            cor = '#ffc107'; // 🟡 Amarelo para suspensos  
+        } else if (props.status && props.status.toLowerCase().includes('atividade')) {
+            cor = '#28a745'; // 🟢 Verde para ativos
+        }
         
         // Define tamanho baseado na quantidade
         const radius = props.qtd_elev >= 5 ? 8 : (props.qtd_elev >= 3 ? 6 : 4);
@@ -329,17 +399,19 @@ function adicionarMarcadores(geojson) {
             fillOpacity: 0.8
         });
         
-        // Adiciona tooltip
-        marker.bindTooltip(
-            `${props.cidade} - ${props.tipo}<br/>
+        // 📝 TOOLTIP ATUALIZADO
+        let tooltipText = `${props.cidade} - ${props.tipo}<br/>
             ${props.qtd_elev} elevadores - ${props.marcaLicitacao}<br/>
-            ${props.regiao} - ${props.status}`,
-            {sticky: true}
-        );
+            ${props.regiao} - ${props.status}`;
         
-        // Adiciona popup
-        marker.bindPopup(
-            `<div style="font-family: Arial, sans-serif;">
+        if (props.nElevadorParado && props.nElevadorParado > 0) {
+            tooltipText += `<br/><strong style="color: #dc3545;">⚠️ ${props.nElevadorParado} parado(s)</strong>`;
+        }
+        
+        marker.bindTooltip(tooltipText, {sticky: true});
+        
+        // 📝 POPUP ATUALIZADO
+        let popupContent = `<div style="font-family: Arial, sans-serif;">
                 <h4 style="margin: 0 0 10px 0; color: #333;">${props.unidade}</h4>
                 <p><strong>Cidade:</strong> ${props.cidade}</p>
                 <p><strong>Endereço:</strong> ${props.endereco}</p>
@@ -348,16 +420,33 @@ function adicionarMarcadores(geojson) {
                 <p><strong>Paradas:</strong> ${props.paradas}</p>
                 <p><strong>Marca:</strong> ${props.marca}</p>
                 <p><strong>Empresa:</strong> ${props.empresa}</p>
-                <p><strong>Status:</strong> ${props.status}</p>
-            </div>`,
-            {maxWidth: 350}
-        );
+                <p><strong>Status:</strong> ${props.status}</p>`;
+        
+        // 🆕 ADICIONA INFORMAÇÕES DE ELEVADORES PARADOS
+        if (props.nElevadorParado && props.nElevadorParado > 0) {
+            popupContent += `
+                <hr style="margin: 10px 0;">
+                <p style="color: #dc3545;"><strong>⚠️ Elevadores Parados:</strong> ${props.nElevadorParado}</p>`;
+        }
+        if ((props.nElevadorParado && props.nElevadorParado > 0) || props.status && props.status.toLowerCase().includes('suspenso')) {    
+            if (props.dataDeParada) {
+                popupContent += `<p style="color: #dc3545;"><strong>📅 Data da Parada:</strong> ${props.dataDeParada}</p>`;
+            }
+            
+            if (props.previsaoDeRetorno) {
+                popupContent += `<p style="color: #dc3545;"><strong>🔄 Previsão de Retorno:</strong> ${props.previsaoDeRetorno}</p>`;
+            }
+        }
+        
+        popupContent += '</div>';
+        
+        marker.bindPopup(popupContent, {maxWidth: 350});
         
         // Adiciona ao grupo de camadas
         layerGroup.addLayer(marker);
         
         if (index < 3) {
-            console.log(`✅ Marcador ${index + 1} adicionado: ${props.unidade}`);
+            console.log(`✅ Marcador ${index + 1} adicionado: ${props.unidade} (Cor: ${cor})`);
         }
     });
     
@@ -373,6 +462,7 @@ function obterSelecionados(categoria) {
 }
 
 // Função para aplicar filtros
+// Função para aplicar filtros - COM SITUAÇÃO
 function aplicarFiltros() {
     console.log('🎯 ========== APLICANDO FILTROS ==========');
     
@@ -380,12 +470,14 @@ function aplicarFiltros() {
     const regioesSelecionadas = obterSelecionados('regiao');
     const marcasSelecionadas = obterSelecionados('marca');
     const empresasSelecionadas = obterSelecionados('empresa');
+    const situacoesSelecionadas = obterSelecionados('situacao'); // 🆕 NOVO FILTRO
 
     console.log('📋 Resumo dos filtros:', {
         tipos: tiposSelecionados,
         regioes: regioesSelecionadas,
         marcas: marcasSelecionadas,
-        empresas: empresasSelecionadas
+        empresas: empresasSelecionadas,
+        situacoes: situacoesSelecionadas // 🆕 NOVO
     });
 
     if (!dadosOriginais || !dadosOriginais.features) {
@@ -406,7 +498,34 @@ function aplicarFiltros() {
             const passaMarca = marcasSelecionadas.length === 0 || marcasSelecionadas.includes(props.marcaLicitacao);
             const passaEmpresa = empresasSelecionadas.length === 0 || empresasSelecionadas.includes(props.empresa);
             
-            return passaTipo && passaRegiao && passaMarca && passaEmpresa;
+            // 🆕 NOVA LÓGICA DE FILTRO POR SITUAÇÃO
+            let passaSituacao = true;
+            if (situacoesSelecionadas.length > 0) {
+                passaSituacao = false;
+                
+                // Verifica cada situação selecionada
+                situacoesSelecionadas.forEach(situacao => {
+                    if (situacao === 'ativos') {
+                        // Ativos: status ativo E sem elevadores parados
+                        if (props.status && props.status.toLowerCase().includes('atividade') && 
+                            (!props.nElevadorParado || props.nElevadorParado === 0)) {
+                            passaSituacao = true;
+                        }
+                    } else if (situacao === 'suspensos') {
+                        // Suspensos: status suspenso
+                        if (props.status && props.status.toLowerCase().includes('suspenso')) {
+                            passaSituacao = true;
+                        }
+                    } else if (situacao === 'parados') {
+                        // Parados: tem elevadores parados
+                        if (props.nElevadorParado && props.nElevadorParado > 0) {
+                            passaSituacao = true;
+                        }
+                    }
+                });
+            }
+            
+            return passaTipo && passaRegiao && passaMarca && passaEmpresa && passaSituacao;
         })
     };
 
@@ -476,16 +595,18 @@ function atualizarContadorFiltros() {
     console.log(`�� Contador atualizado: ${totalElevadores} elevadores em ${totalLocais} locais`);
 }
 
-// Função para atualizar estatísticas da dashboard
+// Função para atualizar estatísticas da dashboard - COM SITUAÇÃO
 function atualizarEstatisticasDashboard() {
     const tiposSelecionados = obterSelecionados('tipo');
     const regioesSelecionadas = obterSelecionados('regiao');
     const marcasSelecionadas = obterSelecionados('marca');
     const empresasSelecionadas = obterSelecionados('empresa');
+    const situacoesSelecionadas = obterSelecionados('situacao'); // 🆕 NOVO
 
     // Se nenhum filtro ativo, limpa todos os filtros
     if (tiposSelecionados.length === 0 && regioesSelecionadas.length === 0 && 
-        marcasSelecionadas.length === 0 && empresasSelecionadas.length === 0) {
+        marcasSelecionadas.length === 0 && empresasSelecionadas.length === 0 &&
+        situacoesSelecionadas.length === 0) { // 🆕 INCLUIR NOVO FILTRO
         console.log('⏭️ Nenhum filtro ativo, limpando todos os filtros');
         limparFiltros();
         return;
@@ -497,9 +618,11 @@ function atualizarEstatisticasDashboard() {
     regioesSelecionadas.forEach(regiao => params.append('regiao', regiao));
     marcasSelecionadas.forEach(marca => params.append('marca', marca));
     empresasSelecionadas.forEach(empresa => params.append('empresa', empresa));
+    situacoesSelecionadas.forEach(situacao => params.append('situacao', situacao)); // 🆕 NOVO
 
     console.log('📡 Fazendo requisição para API...');
 
+    // ... resto da função permanece igual
     // Mostra loading
     const loadingElement = document.getElementById('loading-stats');
     if (loadingElement) loadingElement.style.display = 'block';
@@ -520,7 +643,8 @@ function atualizarEstatisticasDashboard() {
                     'stat-cidades': data.stats.cidades,
                     'stat-regioes': data.stats.regioes,
                     'stat-ativos': data.stats.em_atividade,
-                    'stat-suspensos': data.stats.suspensos
+                    'stat-suspensos': data.stats.suspensos,
+                    'stat-parados':data.stats.elevadores_parados
                 };
                 
                 for (let id in elementos) {
@@ -539,6 +663,7 @@ function atualizarEstatisticasDashboard() {
 
                 // Atualiza estatísticas detalhadas
                 mostrarEstatisticasDetalhadas(data.stats);
+                atualizarElevadoresParados();
             }
         })
         .catch(error => {
@@ -604,6 +729,7 @@ function limparFiltros() {
     }
     
     console.log('✅ Filtros limpos');
+    carregarElevadoresParadosIniciais();
 }
 
 function selecionarTodos() {
@@ -652,6 +778,183 @@ function atualizarDados() {
             btn.innerHTML = originalText;
             btn.disabled = false;
         });
+}
+// ========== FUNÇÕES PARA ELEVADORES PARADOS ==========
+
+// Função para carregar elevadores parados iniciais
+function carregarElevadoresParadosIniciais() {
+    console.log('🔴 Carregando elevadores parados iniciais...');
+    
+    if (!dadosOriginais || !dadosOriginais.features) {
+        console.log('⚠️ Dados não disponíveis para elevadores parados');
+        return;
+    }
+    
+    const elevadoresParados = [];
+    
+    dadosOriginais.features.forEach(feature => {
+        const props = feature.properties;
+        if (props.nElevadorParado && props.nElevadorParado > 0) {
+            elevadoresParados.push({
+                cidade: props.cidade,
+                unidade: props.unidade,
+                tipo: props.tipo,
+                quantidade: props.nElevadorParado,
+                empresa: props.empresa,
+                dataDeParada: props.dataDeParada,
+                previsaoDeRetorno: props.previsaoDeRetorno,
+                qtd_total_elevadores: props.qtd_elev
+            });
+        }
+    });
+    
+    // Ordena por cidade e unidade
+    elevadoresParados.sort((a, b) => {
+        if (a.cidade !== b.cidade) return a.cidade.localeCompare(b.cidade);
+        return a.unidade.localeCompare(b.unidade);
+    });
+    
+    console.log(`🔴 ${elevadoresParados.length} elevadores parados encontrados inicialmente`);
+    
+    mostrarElevadoresParados(elevadoresParados);
+}
+
+// Função para atualizar elevadores parados via API
+function atualizarElevadoresParados() {
+    const tiposSelecionados = obterSelecionados('tipo');
+    const regioesSelecionadas = obterSelecionados('regiao');
+    const marcasSelecionadas = obterSelecionados('marca');
+    const empresasSelecionadas = obterSelecionados('empresa');
+    const situacoesSelecionadas = obterSelecionados('situacao');
+
+    // Se nenhum filtro ativo, usa dados iniciais
+    if (tiposSelecionados.length === 0 && regioesSelecionadas.length === 0 && 
+        marcasSelecionadas.length === 0 && empresasSelecionadas.length === 0 &&
+        situacoesSelecionadas.length === 0) {
+        console.log('⏭️ Nenhum filtro ativo, usando dados iniciais de elevadores parados');
+        carregarElevadoresParadosIniciais();
+        return;
+    }
+
+    // Monta parâmetros
+    const params = new URLSearchParams();
+    tiposSelecionados.forEach(tipo => params.append('tipo', tipo));
+    regioesSelecionadas.forEach(regiao => params.append('regiao', regiao));
+    marcasSelecionadas.forEach(marca => params.append('marca', marca));
+    empresasSelecionadas.forEach(empresa => params.append('empresa', empresa));
+    situacoesSelecionadas.forEach(situacao => params.append('situacao', situacao));
+
+    console.log('📡 Fazendo requisição para API de elevadores parados...');
+
+    // Mostra loading
+    const loadingElement = document.getElementById('loading-elevadores-parados');
+    if (loadingElement) loadingElement.style.display = 'block';
+
+    // Faz requisição
+    fetch('/api/elevadores-parados?' + params.toString())
+        .then(response => response.json())
+        .then(data => {
+            if (loadingElement) loadingElement.style.display = 'none';
+            
+            console.log('📡 Resposta da API elevadores parados:', data);
+            
+            if (data.success) {
+                mostrarElevadoresParados(data.elevadores_parados);
+            }
+        })
+        .catch(error => {
+            if (loadingElement) loadingElement.style.display = 'none';
+            console.error('❌ Erro ao carregar elevadores parados:', error);
+        });
+}
+
+// Função para exibir lista de elevadores parados
+function mostrarElevadoresParados(elevadoresParados) {
+    const container = document.getElementById('lista-elevadores-parados');
+    const badge = document.getElementById('badge-total-parados');
+    
+    if (!container) return;
+    
+    // Atualiza badge com total
+    if (badge) {
+        badge.textContent = elevadoresParados.length;
+    }
+    
+    if (elevadoresParados.length === 0) {
+        container.innerHTML = `
+            <div class="alert alert-success text-center">
+                <i class="fas fa-check-circle"></i>
+                <strong>Ótimas notícias!</strong> Nenhum elevador parado encontrado com os filtros aplicados.
+            </div>
+        `;
+        return;
+    }
+    
+    let html = `
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>${elevadoresParados.length} elevador(es) parado(s)</strong> encontrado(s) com os filtros aplicados.
+        </div>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th><i class="fas fa-map-marker-alt"></i> Cidade</th>
+                        <th><i class="fas fa-building"></i> Unidade</th>
+                        <th><i class="fas fa-elevator"></i> Tipo</th>
+                        <th><i class="fas fa-hashtag"></i> Parados</th>
+                        <th><i class="fas fa-industry"></i> Empresa</th>
+                        <th><i class="fas fa-calendar-times"></i> Data Parada</th>
+                        <th><i class="fas fa-calendar-check"></i> Previsão Retorno</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    elevadoresParados.forEach((elevador, index) => {
+        const dataParada = elevador.dataDeParada || '<span class="text-muted">-</span>';
+        const previsaoRetorno = elevador.previsaoDeRetorno || '<span class="text-muted">-</span>';
+        
+        // ✅ VERSÃO MELHORADA
+        const tipoLimpo = elevador.tipo.toLowerCase().trim();
+        const badgeColor = tipoLimpo === "montacarga" ? "bg-secondary":
+                        tipoLimpo === "passageiro" ? "bg-info":
+                        tipoLimpo === "plataforma" ? "bg-success":
+                        "bg-primary";
+        
+        html += `
+            <tr>
+                <td><strong>${elevador.cidade}</strong></td>
+                <td>${elevador.unidade}</td>
+                <td>
+                    <span class="badge ${badgeColor}">${elevador.tipo}</span>
+                </td>
+                <td>
+                    <span class="badge bg-danger">${elevador.quantidade}</span>
+                    <small class="text-muted d-block">de ${elevador.qtd_total_elevadores} total</small>
+                </td>
+                <td>${elevador.empresa}</td>
+                <td>${dataParada}</td>
+                <td>${previsaoRetorno}</td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-3">
+            <small class="text-muted">
+                <i class="fas fa-info-circle"></i>
+                Lista atualizada automaticamente conforme os filtros aplicados no mapa.
+            </small>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+    
+    console.log(`✅ Lista de elevadores parados atualizada: ${elevadoresParados.length} itens`);
 }
 </script>
 {% endblock %}

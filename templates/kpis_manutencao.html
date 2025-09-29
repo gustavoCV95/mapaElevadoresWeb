@@ -1,0 +1,679 @@
+{% extends "base.html" %}
+
+{% block title %}KPIs de Manutenção - Sistema de Elevadores TJ/MG{% endblock %}
+
+{% block extra_head %}
+<!-- Chart.js para gráficos -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-wrench"></i> 
+            KPIs de Manutenção - Sistema de Elevadores TJ/MG
+        </h1>
+    </div>
+</div>
+
+{% if erro %}
+    <div class="alert alert-danger" role="alert">
+        <i class="fas fa-exclamation-triangle"></i> {{ erro }}
+    </div>
+{% else %}
+
+<!-- 🆕 DEBUG - REMOVER DEPOIS DE TESTAR -->
+<div class="alert alert-info">
+    <strong>Debug:</strong><br>
+    Cidades: {{ cidades_unicas|length }} itens<br>
+    Unidades: {{ unidades_unicas|length }} itens<br>
+    Tipos Atividade: {{ tipos_atividade_unicos|length }} itens<br>
+    Tipos Manutenção: {{ tipos_manutencao_unicos|length }} itens
+</div>
+
+<!-- Filtros -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-filter"></i> Filtros</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- FILTRO POR CIDADE -->
+                    <div class="col-md-3">
+                        <label class="form-label"><strong>🏙️ Cidade</strong></label>
+                        <div style="max-height: 120px; overflow-y: auto; border: 1px solid #ddd; padding: 8px; border-radius: 4px;">
+                            {% for cidade in cidades_unicas %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="check-cidade-kpi-{{ loop.index }}" value="{{ cidade }}" onchange="aplicarFiltrosKPIs()">
+                                <label class="form-check-label" for="check-cidade-kpi-{{ loop.index }}">{{ cidade }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- FILTRO POR UNIDADE -->
+                    <div class="col-md-3">
+                        <label class="form-label"><strong>🏢 Unidade</strong></label>
+                        <div style="max-height: 120px; overflow-y: auto; border: 1px solid #ddd; padding: 8px; border-radius: 4px;">
+                            {% for unidade in unidades_unicas %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="check-unidade-kpi-{{ loop.index }}" value="{{ unidade }}" onchange="aplicarFiltrosKPIs()">
+                                <label class="form-check-label" for="check-unidade-kpi-{{ loop.index }}">{{ unidade }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- FILTRO POR TIPO DE ATIVIDADE -->
+                    <div class="col-md-3">
+                        <label class="form-label"><strong>⚙️ Tipo de Atividade</strong></label>
+                        <div style="max-height: 120px; overflow-y: auto; border: 1px solid #ddd; padding: 8px; border-radius: 4px;">
+                            {% for tipo_atividade in tipos_atividade_unicos %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="check-tipo-atividade-kpi-{{ loop.index }}" value="{{ tipo_atividade }}" onchange="aplicarFiltrosKPIs()">
+                                <label class="form-check-label" for="check-tipo-atividade-kpi-{{ loop.index }}">{{ tipo_atividade }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- FILTRO POR TIPO DE MANUTENÇÃO -->
+                    <div class="col-md-3">
+                        <label class="form-label"><strong>🔧 Tipo de Manutenção</strong></label>
+                        <div style="max-height: 120px; overflow-y: auto; border: 1px solid #ddd; padding: 8px; border-radius: 4px;">
+                            {% for tipo_manutencao in tipos_manutencao_unicos %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="check-tipo-manutencao-kpi-{{ loop.index }}" value="{{ tipo_manutencao }}" onchange="aplicarFiltrosKPIs()">
+                                <label class="form-check-label" for="check-tipo-manutencao-kpi-{{ loop.index }}">{{ tipo_manutencao }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FILTRO POR DATA -->
+                <div class="row mt-3">
+                    <div class="col-md-4">
+                        <label class="form-label"><strong>📅 Data Início</strong></label>
+                        <input type="date" class="form-control" id="data-inicio" onchange="aplicarFiltrosKPIs()">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label"><strong>📅 Data Fim</strong></label>
+                        <input type="date" class="form-control" id="data-fim" onchange="aplicarFiltrosKPIs()">
+                    </div>
+                </div>
+
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <button class="btn btn-success btn-sm" onclick="selecionarTodosKPIs()">
+                            <i class="fas fa-check-square"></i> Selecionar Todos
+                        </button>
+                        <button class="btn btn-danger btn-sm ms-2" onclick="limparFiltrosKPIs()">
+                            <i class="fas fa-times"></i> Limpar Filtros
+                        </button>
+                        <button class="btn btn-info btn-sm ms-2" onclick="atualizarDados()">
+                            <i class="fas fa-sync-alt"></i> Atualizar Dados
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 🆕 CARDS DE KPIs GERAIS -->
+<div class="row mb-4" id="kpis-cards">
+    <div class="col-12">
+        <div id="loading-kpis" class="text-center" style="display: none;">
+            <i class="fas fa-spinner fa-spin"></i> Carregando KPIs...
+        </div>
+        <div id="kpis-resumo">
+            <p class="text-muted text-center">Use os filtros acima para calcular KPIs específicos ou deixe vazio para ver todos os dados.</p>
+        </div>
+    </div>
+</div>
+
+<!-- 🆕 GRÁFICOS -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-pie"></i> Preventiva vs Corretiva</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="chartDisponibilidade" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-bar"></i> Tempo Médio por Cidade</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="chartTempoEmpresa" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-line"></i> Distribuição de Tempos de Atendimento</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="chartDistribuicao" width="400" height="150"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 🆕 TABELAS DETALHADAS -->
+<div class="row mb-4">
+    <!-- Performance por Categoria -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-table"></i> Performance por Categoria</h5>
+            </div>
+            <div class="card-body">
+                <div id="tabelas-performance">
+                    <p class="text-muted">Aplique filtros para ver performance detalhada.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Equipamentos Problemáticos -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-exclamation-triangle text-danger"></i> Equipamentos Problemáticos</h5>
+                <span id="badge-criticos" class="badge bg-danger">0</span>
+            </div>
+            <div class="card-body">
+                <div id="lista-criticos">
+                    <p class="text-muted">Aplique filtros para ver equipamentos problemáticos.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endif %}
+
+<script>
+// Variáveis globais para gráficos
+let chartDisponibilidade = null;
+let chartTempoEmpresa = null;
+let chartDistribuicao = null;
+
+// Função para obter valores selecionados dos filtros
+function obterSelecionadosKPIs(categoria) {
+    const checkboxes = document.querySelectorAll(`input[id^="check-${categoria}-kpi-"]:checked`);
+    return Array.from(checkboxes).map(cb => cb.value);
+}
+
+// Função para aplicar filtros
+function aplicarFiltrosKPIs() {
+    console.log('🎯 Aplicando filtros KPIs...');
+    
+    const cidades = obterSelecionadosKPIs('cidade');
+    const unidades = obterSelecionadosKPIs('unidade');
+    const tiposAtividade = obterSelecionadosKPIs('tipo-atividade');
+    const tiposManutencao = obterSelecionadosKPIs('tipo-manutencao');
+    const dataInicio = document.getElementById('data-inicio')?.value || '';
+    const dataFim = document.getElementById('data-fim')?.value || '';
+    
+    console.log('Filtros coletados:', {cidades, unidades, tiposAtividade, tiposManutencao, dataInicio, dataFim});
+    
+    // Se nenhum filtro, limpa tudo
+    if (cidades.length === 0 && unidades.length === 0 && tiposAtividade.length === 0 && tiposManutencao.length === 0 && !dataInicio && !dataFim) {
+        limparKPIs();
+        return;
+    }
+    
+    // Monta parâmetros
+    const params = new URLSearchParams();
+    cidades.forEach(cidade => params.append('cidade', cidade));
+    unidades.forEach(unidade => params.append('unidade', unidade));
+    tiposAtividade.forEach(tipo => params.append('tipo_atividade', tipo));
+    tiposManutencao.forEach(tipo => params.append('tipo_manutencao', tipo));
+    if (dataInicio) params.append('data_inicio', dataInicio);
+    if (dataFim) params.append('data_fim', dataFim);
+    
+    console.log('Parâmetros da API:', params.toString());
+    
+    // Mostra loading
+    const loadingElement = document.getElementById('loading-kpis');
+    if (loadingElement) loadingElement.style.display = 'block';
+    
+    // Faz requisição
+    fetch('/api/kpis-manutencao?' + params.toString())
+        .then(response => {
+            console.log('Status da resposta:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            if (loadingElement) loadingElement.style.display = 'none';
+            
+            console.log('Resposta da API:', data);
+            
+            if (data.success) {
+                mostrarKPIs(data.kpis);
+            } else {
+                console.error('Erro ao carregar KPIs:', data.erro || 'Erro desconhecido');
+                alert('Erro ao carregar KPIs: ' + (data.erro || 'Erro desconhecido'));
+            }
+        })
+        .catch(error => {
+            if (loadingElement) loadingElement.style.display = 'none';
+            console.error('Erro na requisição KPIs:', error);
+            alert('Erro na requisição: ' + error.message);
+        });
+}
+
+// Função para mostrar KPIs
+function mostrarKPIs(kpis) {
+    console.log('📊 Mostrando KPIs:', kpis);
+    
+    // Atualiza cards de resumo
+    if (kpis.resumo) {
+        mostrarResumoKPIs(kpis.resumo);
+    }
+    
+    // Atualiza gráficos
+    if (kpis.graficos) {
+        atualizarGraficos(kpis.graficos);
+    }
+    
+    // Atualiza tabelas
+    mostrarTabelasPerformance(kpis);
+    
+    // Atualiza equipamentos problemáticos
+    if (kpis.equipamentos_problematicos) {
+        mostrarEquipamentosProblematicos(kpis.equipamentos_problematicos);
+    }
+}
+
+// Função para mostrar resumo em cards
+function mostrarResumoKPIs(resumo) {
+    const container = document.getElementById('kpis-resumo');
+    if (!container) return;
+    
+    const html = `
+        <div class="row">
+            <div class="col-md-2">
+                <div class="card bg-info text-white">
+                    <div class="card-body text-center">
+                        <i class="fas fa-tools fa-2x mb-2"></i>
+                        <h3>${resumo.total_atendimentos || 0}</h3>
+                        <p class="mb-0">Atendimentos</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-2">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <i class="fas fa-clock fa-2x mb-2"></i>
+                        <h3>${resumo.tempo_medio_geral || 0}h</h3>
+                        <p class="mb-0">Tempo Médio</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-2">
+                <div class="card bg-warning text-white">
+                    <div class="card-body text-center">
+                        <i class="fas fa-chart-line fa-2x mb-2"></i>
+                        <h3>${resumo.tempo_mediano_geral || 0}h</h3>
+                        <p class="mb-0">Tempo Mediano</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-2">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <i class="fas fa-elevator fa-2x mb-2"></i>
+                        <h3>${resumo.equipamentos_unicos || 0}</h3>
+                        <p class="mb-0">Equipamentos</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card bg-dark text-white">
+                    <div class="card-body text-center">
+                        <i class="fas fa-calendar fa-2x mb-2"></i>
+                        <h6>${resumo.periodo_analise || 'N/A'}</h6>
+                        <p class="mb-0">Período</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+// Função para atualizar gráficos
+function atualizarGraficos(graficos) {
+    console.log('📈 Atualizando gráficos:', graficos);
+    
+    // Gráfico 1: Distribuição de Tempos
+    if (graficos.distribuicao_tempos) {
+        criarGraficoDistribuicao(graficos.distribuicao_tempos);
+    }
+    
+    // Gráfico 2: Preventiva vs Corretiva
+    if (graficos.preventiva_vs_corretiva) {
+        criarGraficoPreventivosCorretivos(graficos.preventiva_vs_corretiva);
+    }
+    
+    // Gráfico 3: Tempo médio por cidade
+    if (graficos.tempo_medio_cidade) {
+        criarGraficoTempoCidade(graficos.tempo_medio_cidade);
+    }
+}
+
+// Função para criar gráfico de distribuição de tempos
+function criarGraficoDistribuicao(dados) {
+    const ctx = document.getElementById('chartDistribuicao');
+    if (!ctx) {
+        console.error('Elemento chartDistribuicao não encontrado!');
+        return;
+    }
+    
+    console.log('Criando gráfico de distribuição:', dados);
+    
+    if (chartDistribuicao) {
+        chartDistribuicao.destroy();
+    }
+    
+    chartDistribuicao = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(dados),
+            datasets: [{
+                label: 'Quantidade de Atendimentos',
+                data: Object.values(dados),
+                backgroundColor: [
+                    '#28a745', '#17a2b8', '#ffc107', '#fd7e14', '#dc3545'
+                ],
+                borderColor: [
+                    '#1e7e34', '#138496', '#e0a800', '#e8590c', '#bd2130'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Distribuição de Tempos de Atendimento'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+// Função para criar gráfico preventiva vs corretiva
+function criarGraficoPreventivosCorretivos(dados) {
+    const ctx = document.getElementById('chartDisponibilidade');
+    if (!ctx) {
+        console.error('Elemento chartDisponibilidade não encontrado!');
+        return;
+    }
+    
+    console.log('Criando gráfico preventiva vs corretiva:', dados);
+    
+    if (chartDisponibilidade) {
+        chartDisponibilidade.destroy();
+    }
+    
+    chartDisponibilidade = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: Object.keys(dados),
+            datasets: [{
+                data: Object.values(dados),
+                backgroundColor: ['#28a745', '#dc3545'],
+                borderColor: ['#1e7e34', '#bd2130'],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Preventiva vs Corretiva'
+                },
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+// Função para criar gráfico tempo por cidade
+function criarGraficoTempoCidade(dados) {
+    const ctx = document.getElementById('chartTempoEmpresa');
+    if (!ctx) {
+        console.error('Elemento chartTempoEmpresa não encontrado!');
+        return;
+    }
+    
+    console.log('Criando gráfico tempo por cidade:', dados);
+    
+    if (chartTempoEmpresa) {
+        chartTempoEmpresa.destroy();
+    }
+    
+    chartTempoEmpresa = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(dados),
+            datasets: [{
+                label: 'Tempo Médio (horas)',
+                data: Object.values(dados),
+                backgroundColor: '#17a2b8',
+                borderColor: '#138496',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Tempo Médio por Cidade'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+// Função para mostrar tabelas de performance
+function mostrarTabelasPerformance(kpis) {
+    const container = document.getElementById('tabelas-performance');
+    if (!container) return;
+    
+    let html = '<div class="accordion" id="accordionPerformance">';
+    
+    // Performance por Cidade
+    if (kpis.performance_cidade && kpis.performance_cidade.length > 0) {
+        html += `
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingCidade">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCidade">
+                        📍 Performance por Cidade
+                    </button>
+                </h2>
+                <div id="collapseCidade" class="accordion-collapse collapse show" data-bs-parent="#accordionPerformance">
+                    <div class="accordion-body">
+                        <table class="table table-striped table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Cidade</th>
+                                    <th>Atendimentos</th>
+                                    <th>Tempo Médio (h)</th>
+                                    <th>Equipamentos</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+        
+        kpis.performance_cidade.forEach(item => {
+            html += `
+                <tr>
+                    <td><strong>${item.Cidade}</strong></td>
+                    <td>${item.Total_Atendimentos}</td>
+                    <td>${item.Tempo_Medio}</td>
+                    <td>${item.Equipamentos_Unicos}</td>
+                </tr>`;
+        });
+        
+        html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+    }
+    
+    html += '</div>';
+    
+    if (html === '<div class="accordion" id="accordionPerformance"></div>') {
+        html = '<p class="text-muted">Nenhum dado de performance disponível.</p>';
+    }
+    
+    container.innerHTML = html;
+}
+
+// Função para mostrar equipamentos problemáticos
+function mostrarEquipamentosProblematicos(equipamentos) {
+    const container = document.getElementById('lista-criticos');
+    const badge = document.getElementById('badge-criticos');
+    
+    if (!container) return;
+    
+    if (badge) {
+        badge.textContent = equipamentos.length;
+    }
+    
+    if (equipamentos.length === 0) {
+        container.innerHTML = '<p class="text-muted">Nenhum equipamento problemático encontrado.</p>';
+        return;
+    }
+    
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-sm">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Equipamento</th>
+                        <th>Total Atend.</th>
+                        <th>Tempo Médio</th>
+                        <th>Corretivas</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+    
+    equipamentos.forEach(item => {
+        html += `
+            <tr>
+                <td><strong>${item.Equipamento}</strong></td>
+                <td>${item.Total_Atendimentos}</td>
+                <td>${item.Tempo_Medio}h</td>
+                <td><span class="badge bg-danger">${item.Manutencoes_Corretivas}</span></td>
+            </tr>`;
+    });
+    
+    html += `
+                </tbody>
+            </table>
+        </div>`;
+    
+    container.innerHTML = html;
+}
+
+// Funções dos botões
+function selecionarTodosKPIs() {
+    console.log('✅ Selecionando todos os filtros KPIs...');
+    
+    const checkboxes = document.querySelectorAll('input[type="checkbox"][id*="-kpi-"]');
+    checkboxes.forEach(cb => cb.checked = true);
+    
+    console.log(`Selecionados ${checkboxes.length} checkboxes`);
+    aplicarFiltrosKPIs();
+}
+
+function limparFiltrosKPIs() {
+    console.log('🧹 Limpando todos os filtros KPIs...');
+    
+    const checkboxes = document.querySelectorAll('input[type="checkbox"][id*="-kpi-"]');
+    checkboxes.forEach(cb => cb.checked = false);
+    
+    const dataInicio = document.getElementById('data-inicio');
+    const dataFim = document.getElementById('data-fim');
+    if (dataInicio) dataInicio.value = '';
+    if (dataFim) dataFim.value = '';
+    
+    console.log(`Limpos ${checkboxes.length} checkboxes e campos de data`);
+    limparKPIs();
+}
+
+function limparKPIs() {
+    console.log('🗑️ Limpando interface KPIs...');
+    
+    document.getElementById('kpis-resumo').innerHTML = '<p class="text-muted text-center">Use os filtros acima para calcular KPIs específicos ou deixe vazio para ver todos os dados.</p>';
+    document.getElementById('tabelas-performance').innerHTML = '<p class="text-muted">Aplique filtros para ver performance detalhada.</p>';
+    document.getElementById('lista-criticos').innerHTML = '<p class="text-muted">Aplique filtros para ver equipamentos problemáticos.</p>';
+    
+    const badge = document.getElementById('badge-criticos');
+    if (badge) badge.textContent = '0';
+    
+    if (chartDisponibilidade) {
+        chartDisponibilidade.destroy();
+        chartDisponibilidade = null;
+    }
+    if (chartTempoEmpresa) {
+        chartTempoEmpresa.destroy();
+        chartTempoEmpresa = null;
+    }
+    if (chartDistribuicao) {
+        chartDistribuicao.destroy();
+        chartDistribuicao = null;
+    }
+}
+
+function atualizarDados() {
+    window.location.reload();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📄 Página KPIs carregada');
+});
+</script>
+
+{% endblock %}

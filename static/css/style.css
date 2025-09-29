@@ -38,22 +38,31 @@ body {
     border: none;
 }
 
-.card.bg-primary .card-body,
-.card.bg-success .card-body,
-.card.bg-info .card-body,
-.card.bg-warning .card-body,
-.card.bg-danger .card-body {
+/* Estilo para TODOS os cards coloridos */
+.card[class*="bg-"] .card-body {
     padding: 1.5rem 1rem;
 }
 
 /* Responsividade */
-@media (max-width: 768px) {
-    .card.bg-primary,
-    .card.bg-success,
-    .card.bg-info,
-    .card.bg-warning,
-    .card.bg-danger {
-        margin-bottom: 1rem;
+/* Ajuste para 7 cards responsivos */
+@media (min-width: 1200px) {
+    .stats-row .col-md-2 {
+        flex: 0 0 14.285714%; /* 100% / 7 = 14.285714% */
+        max-width: 14.285714%;
+    }
+}
+
+@media (max-width: 1199px) {
+    .stats-row .col-md-2 {
+        flex: 0 0 33.333333%; /* 3 por linha em tablets */
+        max-width: 33.333333%;
+    }
+}
+
+@media (max-width: 767px) {
+    .stats-row .col-md-2 {
+        flex: 0 0 50%; /* 2 por linha em mobile */
+        max-width: 50%;
     }
 }
 
