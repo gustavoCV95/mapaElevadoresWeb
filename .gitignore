@@ -1,0 +1,24 @@
+# Arquivos de ambiente e credenciais
+.env
+credenciais.json
+
+# Dependências do Python
+__pycache__/
+*.pyc
+*.pyd
+*.pyo
+.Python
+env/
+.venv/
+.ebextensions/
+
+# Logs
+*.log
+log/
+tmp/
+
+# Arquivos do sistema operacional (macOS)
+.DS_Store
+
+# Arquivos do sistema operacional (Windows)
+Thumbs.db
