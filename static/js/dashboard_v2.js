@@ -72,7 +72,7 @@ function adicionarMarcadores(geojsonData) {
         })
         
         // Tooltip
-        let tooltipText = `${props.cidade}-${props.tipo}<br/>
+        let tooltipText = `${props.cidade} - ${props.tipo}<br/>
         ${props.qtd_elev} elevadores - ${props.marcaLicitacao}<br/>
         ${props.regiao} - ${props.status}`;
         if(props.nElevadorParado && props.nElevadorParado > 0){
@@ -113,7 +113,7 @@ function adicionarMarcadores(geojsonData) {
 
 // NOVO: Aplica filtros E atualiza o mapa
 function aplicarFiltros() {
-    console.log('ðŸ” Aplicando filtros v2.0 com atualização do mapa...');
+    console.log('Aplicando filtros v2.0 com atualização do mapa...');
     
     const tipos = obterSelecionados('tipo');
     const regioes = obterSelecionados('regiao');
@@ -186,7 +186,7 @@ function mostrarLoading(mostrar) {
     }
 }
 
-// ObtÃ©m valores selecionados
+// Obtém valores selecionados
 function obterSelecionados(categoria) {
     const checkboxes = document.querySelectorAll(`input[id^="check-${categoria}-"]:checked`);
     return Array.from(checkboxes).map(cb => cb.value);
@@ -354,7 +354,7 @@ function atualizarElevadoresParados(elevadoresParados) {
 function configurarFiltrosAutomaticos() {
     document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
         checkbox.addEventListener('change', function() {
-            // Aplica filtros automaticamente apÃ³s 500ms de inatividade
+            // Aplica filtros automaticamente após 500ms de inatividade
             clearTimeout(window.filtroTimeout);
             window.filtroTimeout = setTimeout(aplicarFiltros, 500);
         });

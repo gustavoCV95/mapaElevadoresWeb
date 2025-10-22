@@ -1,6 +1,6 @@
 # app/services/auth_service.py
 """
-Serviço de autenticação - VERSÃƒO CORRIGIDA
+Serviço de autenticação - VERSÃO CORRIGIDA
 """
 from datetime import datetime, timedelta
 from flask import current_app, session

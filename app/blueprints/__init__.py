@@ -1,6 +1,6 @@
 # app/api/blueprints.py
 """
-Blueprints da aplicaÃ§Ã£o
+Blueprints da aplicação
 """
 # Importa todos os blueprints para garantir que sejam registrados
 from .test import test_bp

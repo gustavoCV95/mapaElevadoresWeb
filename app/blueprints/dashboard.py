@@ -10,7 +10,7 @@ import time
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/v2')
 
-# âœ… CACHE GLOBAL PARA DADOS PROCESSADOS
+# CACHE GLOBAL PARA DADOS PROCESSADOS
 _dados_cache = {
     'dados_raw': None,
     'processed_data': None,
@@ -19,10 +19,10 @@ _dados_cache = {
 }
 
 def obter_dados_cached():
-    """ObtÃ©m dados com cache inteligente"""
+    """Obtém dados com cache inteligente"""
     global _dados_cache
     
-    # Verifica se cache Ã© vÃ¡lido (5 minutos)
+    # Verifica se cache é válido (5 minutos)
     cache_valido = (
         _dados_cache['timestamp'] and 
         (time.time() - _dados_cache['timestamp']) < 300
@@ -62,11 +62,11 @@ def obter_dados_cached():
 
 @dashboard_bp.route('/')
 @dashboard_bp.route('/dashboard')
-@login_required_v2 # Este Ã© um endpoint de UI (renderiza HTML), entÃ£o login_required_v2 Ã© apropriado.
+@login_required_v2 # Este é um endpoint de UI (renderiza HTML), então login_required_v2 é apropriado.
 def index():
     """Dashboard principal da nova arquitetura"""
     try:
-        print("ðŸ“Š Carregando dashboard...")
+        print("Carregando dashboard...")
         elevators, processed_data = obter_dados_cached()
         
         data_processor = DataProcessor()
@@ -87,7 +87,7 @@ def index():
                              total_elevadores=len(elevators))
                              
     except Exception as e:
-        print(f"âŒ Erro no dashboard: {e}")
+        print(f"Erro no dashboard: {e}")
         import traceback
         traceback.print_exc()
         

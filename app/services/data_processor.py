@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Tuple
 from app.utils.helpers import safe_int, safe_str, safe_float, validate_coordinates
 from app.models.elevator import Elevator
 from app.models.kpi import KPI
+import pytz
 
 class DataProcessor:
     def __init__(self, data=None):
@@ -120,6 +121,7 @@ class DataProcessor:
         print(f"Processando {len(data)} registros de KPIs...")
         
         kpis = []
+        brt = pytz.timezone("America/Sao_Paulo")
         
         for idx, row in data.iterrows():
             try:
@@ -145,15 +147,18 @@ class DataProcessor:
                 except:
                     data_conclusao = pd.to_datetime(row['data_conclusao'], errors='coerce')
                 
-                if pd.isna(data_solicitacao):
+                data_solicitacao_aware = brt.localize(data_solicitacao) if pd.notna(data_solicitacao) else None
+                data_conclusao_aware = brt.localize(data_conclusao) if pd.notna(data_conclusao) else None
+                
+                if pd.isna(data_solicitacao_aware):
                     continue
                 
                 kpi_data = {
                     'edificio': safe_str(row.get('edificio')),
                     'categoria_problema': safe_str(row.get('categoria_problema')),
                     'status': safe_str(row.get('status')),
-                    'data_solicitacao': data_solicitacao,
-                    'data_conclusao': data_conclusao if not pd.isna(data_conclusao) else None,
+                    'data_solicitacao': data_solicitacao_aware,
+                    'data_conclusao': data_conclusao_aware,
                     'equipamento': safe_str(row.get('equipamento'))
                 }
                 
@@ -164,7 +169,7 @@ class DataProcessor:
                 print(f"Erro ao processar KPI {idx}: {e}")
                 continue
         
-        # Calcula mÃ©tricas usando os models
+        # Calcula métricas usando os models
         return kpis
     
     def _calculate_kpi_metrics(self, kpis: List[KPI]) -> Dict[str, Any]:
@@ -174,7 +179,7 @@ class DataProcessor:
         
         concluidos = [kpi for kpi in kpis if kpi.esta_concluido]
         
-        # MÃ©tricas principais
+        # Métricas principais
         metricas = {
             'total_chamados': len(kpis),
             'chamados_concluidos': len(concluidos),
@@ -189,14 +194,14 @@ class DataProcessor:
             import statistics
             metricas['tempo_mediano_reparo'] = statistics.median(tempos_reparo)
         
-        # Chamados por mÃªs
+        # Chamados por mês
         chamados_por_mes = {}
         for kpi in kpis:
             mes = kpi.mes_ano
             chamados_por_mes[mes] = chamados_por_mes.get(mes, 0) + 1
         metricas['chamados_por_mes'] = chamados_por_mes
         
-        # Chamados por edifÃ­cio
+        # Chamados por edifí­cio
         chamados_por_edificio = {}
         for kpi in kpis:
             edificio = kpi.edificio
@@ -262,7 +267,7 @@ class DataProcessor:
         )
         metricas['tempo_por_equipamento'] = tempo_por_equipamento
         
-        print(f"âœ… Métricas processadas: {len(metricas)} categorias")
+        print(f"Métricas processadas: {len(metricas)} categorias")
         return metricas
 
     def apply_filters(self, elevators: List[Elevator], tipos=None, regioes=None, 
@@ -289,13 +294,13 @@ class DataProcessor:
             situacao_filtered = []
             for situacao in situacoes:
                 if situacao == 'suspensos':
-                    # PrÃ©dios com status "Suspenso"
+                    # Prédios com status "Suspenso"
                     situacao_filtered.extend([e for e in filtered if e.status == 'Suspenso'])
                 elif situacao == 'parados':
-                    # âœ… CORRIGIDO: PrÃ©dios que tÃªm elevadores parados (NElevadorParado > 0)
+                    # CORRIGIDO: PrÃ©dios que tÃªm elevadores parados (NElevadorParado > 0)
                     situacao_filtered.extend([e for e in filtered if e.tem_elevador_parado])
                 elif situacao == 'ativos':
-                    # âœ… CORRIGIDO: PrÃ©dios com status "Em atividade" E sem elevadores parados
+                    # CORRIGIDO: Prédios com status "Em atividade" E sem elevadores parados
                     situacao_filtered.extend([e for e in filtered if e.status == 'Em atividade' and not e.tem_elevador_parado])
             
             # Remove duplicatas mantendo ordem
@@ -306,9 +311,9 @@ class DataProcessor:
                     seen.add(e.endereco_completo)
                     filtered.append(e)
         
-        print(f"ðŸ” Filtros aplicados: {len(elevators)} -> {len(filtered)} elevadores")
+        print(f"Filtros aplicados: {len(elevators)} -> {len(filtered)} elevadores")
         if situacoes:
-            print(f"   SituaçÃµes filtradas: {situacoes}")
+            print(f"   Situações filtradas: {situacoes}")
             for situacao in situacoes:
                 count = sum(1 for e in filtered if (
                     (situacao == 'suspensos' and e.status == 'Suspenso') or
@@ -327,12 +332,14 @@ class DataProcessor:
         """
         filtered_kpis = kpis
         
+        brt = pytz.timezone("America/Sao_Paulo")
+
         if data_inicio:
             filtered_kpis = [k for k in filtered_kpis if k.data_solicitacao >= data_inicio]
-        
+            #filtered_kpis  = [k for k in filtered_kpis if brt.localize(k.data_solicitacao) >= data_inicio]
         if data_fim:
             filtered_kpis = [k for k in filtered_kpis if k.data_solicitacao <= data_fim]
-        
+            #filtered_kpis  = [k for k in filtered_kpis if brt.localize(k.data_solicitacao) >= data_fim]
         if status:
             filtered_kpis = [k for k in filtered_kpis if k.status.lower() == status.lower()]
             
@@ -345,15 +352,13 @@ class DataProcessor:
         if equipamento:
             # Garante que 'equipamento' seja string para comparação, caso o model retorne outro tipo
             filtered_kpis = [k for k in filtered_kpis if str(k.equipamento).lower() == equipamento.lower()]
-            
-            filtered_kpis = sorted(filtered_kpis, key = lambda k: k.data_conclusao or datetime.min, reverse = True)
         
         print(f"KPIs: Filtros aplicados resultaram em {len(filtered_kpis)} KPIs.")
         return filtered_kpis
 
     def calculate_stats(self, elevators: List[Elevator]) -> Dict[str, Any]:
         """
-        Calcula estatÃ­sticas dos elevadores
+        Calcula estatísticas dos elevadores
         CORRIGIDO: Quando filtrado por "parados", conta apenas os parados
         """
         if not elevators:

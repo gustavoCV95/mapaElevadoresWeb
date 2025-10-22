@@ -4,7 +4,7 @@ from datetime import timedelta
 from werkzeug.security import generate_password_hash
 
 class BaseConfig:
-    """ConfiguraÃ§Ãµes base compartilhadas entre ambientes"""
+    """Configurações base compartilhadas entre ambientes"""
     
     # ConfiguraÃ§Ãµes Flask
     SECRET_KEY = os.environ.get('FLASK_SECRET_KEY')
@@ -22,21 +22,21 @@ class BaseConfig:
     BLOQUEIO_TEMPO = int(os.environ.get('BLOQUEIO_TEMPO', '900'))  # 15 minutos
     
     def __init__(self):
-        """Inicializa configuraÃ§Ãµes que dependem de mÃ©todos"""
+        """Inicializa configurações que dependem de métodos"""
         self.USUARIOS_AUTORIZADOS = self._get_usuarios_autorizados()
         
-        # âœ… VALIDAÃ‡ÃƒO DAS URLs OBRIGATÃ“RIAS
+        # VALIDAÇÃO DAS URLs OBRIGATÓRIAS
         if not self.PLANILHA_URL:
-            raise ValueError("âŒ PLANILHA_URL deve ser definida como variÃ¡vel de ambiente")
+            raise ValueError("PLANILHA_URL deve ser definida como variÃ¡vel de ambiente")
         if not self.PLANILHA_KPIS_URL:
-            raise ValueError("âŒ PLANILHA_KPIS_URL deve ser definida como variÃ¡vel de ambiente")
+            raise ValueError("PLANILHA_KPIS_URL deve ser definida como variÃ¡vel de ambiente")
     
     def _get_usuarios_autorizados(self):
-        """Carrega usuÃ¡rios das variÃ¡veis de ambiente"""
+        """Carrega usurios das variáveis de ambiente"""
         usuarios = {}
         
         # Formato: USUARIO_1=nome:senha, USUARIO_2=nome:senha, etc.
-        for i in range(1, 11):  # Suporta atÃ© 10 usuÃ¡rios
+        for i in range(1, 11):  # Suporta até 10 usuários
             user_env = os.environ.get(f'USUARIO_{i}')
             if user_env and ':' in user_env:
                 nome, senha = user_env.split(':', 1)
@@ -49,12 +49,12 @@ class BaseConfig:
                 'usuario': generate_password_hash('senha123')
             }
             
-        print(f"ðŸ” {len(usuarios)} usuÃ¡rio(s) carregado(s)")
+        print(f"{len(usuarios)} usuário(s) carregado(s)")
         return usuarios
     
     @classmethod
     def listar_usuarios(cls):
-        """Lista usuÃ¡rios cadastrados (para debug)"""
+        """Lista usuários cadastrados (para debug)"""
         instance = cls()
         usuarios = instance.USUARIOS_AUTORIZADOS
         for usuario in usuarios.keys():

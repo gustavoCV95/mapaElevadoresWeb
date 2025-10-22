@@ -16,10 +16,10 @@ def api_kpis_filtrados():
     start_time = datetime.now()
     
     try:
-        # ObtÃ©m a lista completa de objetos KPI do cache
+        # Obtém a lista completa de objetos KPI do cache
         all_kpis, _ = obter_kpis_cached()
         
-        # Extrai parÃ¢metros de filtro da requisiÃ§Ã£o
+        # Extrai parâmetros de filtro da requisição
         data_inicio_str = request.args.get('data_inicio')
         data_fim_str = request.args.get('data_fim')
         periodo_predefinido = request.args.get('periodo_predefinido')
@@ -38,7 +38,7 @@ def api_kpis_filtrados():
         if data_fim_str:
             data_fim = brt.localize(datetime.strptime(data_fim_str, '%Y-%m-%d')) + timedelta(days=1, seconds=-1) # Inclui o dia todo
 
-        # Aplica perÃ­odo predefinido se nÃ£o houver datas especÃ­ficas
+        # Aplica perí­odo predefinido se não houver datas especí­ficas
         if periodo_predefinido and not (data_inicio_str or data_fim_str):
             hoje = brt.localize(datetime.now())
             if periodo_predefinido == 'ultima-semana':
@@ -55,15 +55,15 @@ def api_kpis_filtrados():
                 data_inicio = hoje - timedelta(days=730)
             elif periodo_predefinido == 'ultimos-5-anos':
                 data_inicio = hoje - timedelta(days=1825)
-            # 'todo-periodo' nÃ£o requer ajuste de data
+            # 'todo-periodo' não requer ajuste de data
 
             # Garante que data_fim esteja definida para filtros predefinidos
             if data_inicio and not data_fim:
-                data_fim = hoje # AtÃ© hoje
+                data_fim = hoje # Até hoje
 
         # Cria um DataProcessor para aplicar os filtros
         data_processor = DataProcessor()
-        
+
         # Filtra a lista de objetos KPI
         kpis_filtrados = data_processor.apply_kpi_filters(
             all_kpis,
@@ -75,18 +75,21 @@ def api_kpis_filtrados():
             equipamento=equipamento_filtro
         )
         
-        # Calcula as mÃ©tricas dos KPIs filtrados
+
+        # Calcula as métricas dos KPIs filtrados
         metricas_filtradas = data_processor._calculate_kpi_metrics(kpis_filtrados)
         
         # Prepara um resumo para a tabela (se necessário, os 20 primeiros, como no JS)
         resumo_tabela = [kpi.to_dict() for kpi in kpis_filtrados[:20]]
 
         elapsed_time = (datetime.now() - start_time).total_seconds()
-        print(f"âœ… KPIs: Filtros aplicados em {elapsed_time:.2f}s: {len(kpis_filtrados)} KPIs.")
+        print(f"KPIs: Filtros aplicados em {elapsed_time:.2f}s: {len(kpis_filtrados)} KPIs.")
         
         return {
             'success': True,
             'metricas': metricas_filtradas,
+            'data início': data_inicio,
+            'data fim': data_fim,
             'resumo': resumo_tabela,
             'total_kpis': len(kpis_filtrados),
             'performance': {
@@ -95,7 +98,7 @@ def api_kpis_filtrados():
             }
         }
     except ValueError as ve:
-        current_app.logger.warning(f"Erro de validaÃ§Ã£o na API de KPIs: {ve}")
+        current_app.logger.warning(f"Erro de validação na API de KPIs: {ve}")
         return {'success': False, 'message': str(ve)}, 400
     except Exception as e:
         current_app.logger.exception(f"Erro na API de KPIs: {e}")

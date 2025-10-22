@@ -6,24 +6,24 @@ from app.services.data_processor import DataProcessor
 from app.services.auth_service import AuthService
 from datetime import datetime
 import time
-import pytz # Para fusos horÃ¡rios
+import pytz # Para fusos horários
 
 kpis_bp = Blueprint('kpis', __name__, url_prefix='/v2/kpis')
 
-# âœ… CACHE GLOBAL PARA DADOS RAW DE KPIS
+# CACHE GLOBAL PARA DADOS RAW DE KPIS
 _kpi_dados_cache = {
     'dados_raw': None,
     'kpis_processed_list': None, # Lista de objetos KPI processados
-    'metricas_calculadas': None, # MÃ©tricas gerais calculadas a partir de todos os KPIs
+    'metricas_calculadas': None, # Métricas gerais calculadas a partir de todos os KPIs
     'timestamp': None
 }
 
 def obter_kpis_cached():
-    """ObtÃ©m dados de KPIs com cache inteligente."""
+    """Obtém dados de KPIs com cache inteligente."""
     global _kpi_dados_cache
     
-    # Verifica se cache Ã© vÃ¡lido (5 minutos)
-    # Converta para o fuso horÃ¡rio BRT para comparaÃ§Ãµes de tempo, se necessÃ¡rio
+    # Verifica se cache é válido (5 minutos)
+    # Converta para o fuso horário BRT para comparações de tempo, se necessário
     brt = pytz.timezone("America/Sao_Paulo")
     
     cache_valido = (
@@ -32,21 +32,21 @@ def obter_kpis_cached():
     )
     
     if cache_valido and _kpi_dados_cache['kpis_processed_list']:
-        print("ðŸ“¦ KPIs: Usando dados do cache")
+        print("KPIs: Usando dados do cache")
         return _kpi_dados_cache['kpis_processed_list'], _kpi_dados_cache['metricas_calculadas']
     
     # Recarrega dados
-    print("ðŸ”„ KPIs: Recarregando dados (cache expirado)")
+    print("KPIs: Recarregando dados (cache expirado)")
     planilha_kpis_url = current_app.config.get('PLANILHA_KPIS_URL')
     if not planilha_kpis_url:
-        raise ValueError("âŒ PLANILHA_KPIS_URL deve ser definida como variÃ¡vel de ambiente")
+        raise ValueError("PLANILHA_KPIS_URL deve ser definida como variável de ambiente")
     
     sheets_service = SheetsService()
     data_processor = DataProcessor()
     
     dados_raw = sheets_service.obter_dados_kpis(planilha_kpis_url)
     if dados_raw.empty:
-        raise ValueError("âŒ Nenhum dado de KPIs encontrado")
+        raise ValueError("Nenhum dado de KPIs encontrado")
     
     # process_kpis_data agora retorna List[KPI]
     kpis_processed_list = data_processor.process_kpis_data(dados_raw) 

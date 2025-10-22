@@ -7,7 +7,7 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/v2/auth')
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    """PÃ¡gina de login da nova arquitetura"""
+    """Página de login da nova arquitetura"""
     if request.method == 'POST':
         if request.is_json:
             return handle_login_api()
