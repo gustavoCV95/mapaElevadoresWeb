@@ -73,9 +73,6 @@ class Elevator:
             'n_elevador_parado',
             'data_de_parada',
             'previsao_de_retorno',
-            # REMOVA AQUI 'cor_marcador' e 'tamanho_marcador'
-            'cor_marcador',      # <-- REMOVER
-            'tamanho_marcador',  # <-- REMOVER
         ]
         for key in keys_to_remove:
             output_dict.pop(key, None)
@@ -88,9 +85,8 @@ class Elevator:
             'dataDeParada': self.data_de_parada,
             'previsaoDeRetorno': self.previsao_de_retorno,
             'temElevadorParado': self.tem_elevador_parado,
-            # ADICIONE AQUI AS VERSÕES EM CAMELCASE das propriedades
-            'corMarcador': self.cor_marcador,      # <-- ADICIONAR
-            'tamanhoMarcador': self.tamanho_marcador # <-- ADICIONAR
+            'corMarcador': self.cor_marcador,
+            'tamanhoMarcador': self.tamanho_marcador
         })
         return output_dict
     
@@ -127,7 +123,7 @@ class Elevator:
             new_key = field_mapping.get(key, key)
             normalized_data[new_key] = value
         
-        # Remove campos que nÃ£o existem no modelo
+        # Remove campos que não existem no modelo
         valid_fields = {f.name for f in cls.__dataclass_fields__.values()}
         filtered_data = {k: v for k, v in normalized_data.items() if k in valid_fields}
         

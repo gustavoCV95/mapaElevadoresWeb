@@ -109,7 +109,7 @@ def api_dados_elevadores_filtrados():
     empresas = request.args.getlist('empresa')
     situacoes = request.args.getlist('situacao')
     
-    print(f"ðŸ” API Filtros: tipos={tipos}, regioes={regioes}, situacoes={situacoes}")
+    print(f"API Filtros: tipos={tipos}, regioes={regioes}, situacoes={situacoes}")
     
     data_processor = DataProcessor()
     elevators_filtered = data_processor.apply_filters(
@@ -127,7 +127,7 @@ def api_dados_elevadores_filtrados():
     geojson_filtrado = criar_geojson_manual(elevators_filtered)
     
     elapsed_time = time.time() - start_time
-    print(f"âœ… Filtros aplicados em {elapsed_time:.2f}s: {len(elevators_filtered)} elevadores")
+    print(f"Filtros aplicados em {elapsed_time:.2f}s: {len(elevators_filtered)} elevadores")
     
     # Retorna um dicionÃ¡rio, que api_auth_required (via json_response) irÃ¡ converter para JSON e lidar com erros
     return {
