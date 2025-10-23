@@ -1,5 +1,5 @@
 # app/utils/__init__.py
-"""MÃ³dulo de utilitÃ¡rios e helpers"""
+"""Módulo de utilitários e helpers"""
 
 # AGORA IMPORTAMOS OS NOVOS DECORADORES DA V2
 from .auth_decorators import login_required_v2, admin_required_v2, api_auth_required, json_response

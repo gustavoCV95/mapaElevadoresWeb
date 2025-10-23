@@ -409,19 +409,16 @@ class DataProcessor:
             for elevator in elevators:
                 elevadores_ativos += elevator.quantidade - elevator.n_elevador_parado
             total_elevadores = elevadores_ativos
-            
+        
         else:
             # SEM FILTRO ou FILTRO MISTO: Lógica completa
             for elevator in elevators:                
                 if elevator.status == 'Suspenso':
                     elevadores_suspensos += elevator.quantidade
                     total_elevadores += elevator.quantidade
-                elif elevator.tem_elevador_parado:
-                    elevadores_parados += elevator.n_elevador_parado
-                    elevadores_ativos += elevator.quantidade - elevator.n_elevador_parado
-                    total_elevadores += elevator.quantidade
                 else:
                     elevadores_ativos += elevator.quantidade
+                    elevadores_parados += elevator.n_elevador_parado
                     total_elevadores += elevator.quantidade
         
         stats = {

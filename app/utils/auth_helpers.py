@@ -34,7 +34,7 @@ def registrar_tentativa_login(ip):
     tentativas_login[ip]['historico'].append(agora)
 
 def limpar_tentativas_login(ip):
-    """Limpa tentativas de login para um IP especÃ­fico"""
+    """Limpa tentativas de login para um IP específico"""
     if ip in tentativas_login:
         del tentativas_login[ip]
 

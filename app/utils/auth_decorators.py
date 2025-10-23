@@ -13,7 +13,7 @@ def json_response(f):
             result = f(*args, **kwargs)
             if isinstance(result, dict):
                 return jsonify(result)
-            # Se a função jÃ¡ retornar um objeto Response (como jsonify), apenas o retorna.
+            # Se a função já retornar um objeto Response (como jsonify), apenas o retorna.
             return result
         except Exception as e:
             # Loga o traceback completo para depuração
@@ -22,21 +22,21 @@ def json_response(f):
             return jsonify({
                 'success': False,
                 'error': str(e),
-                'message': 'Ocorreu um erro interno na API.' # Mensagem amigÃ¡vel para o usuÃ¡rio
+                'message': 'Ocorreu um erro interno na API.' # Mensagem amigável para o usuário
             }), 500
     return decorated_function
 
 # Modificado: api_auth_required agora inclui a funcionalidade de json_response
 def api_auth_required(f):
     """
-    Decorator especÃ­fico para APIs que requer autenticação e padroniza a resposta JSON.
+    Decorator específico para APIs que requer autenticação e padroniza a resposta JSON.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        print(f"ðŸ”’ API Auth check para {request.endpoint}")
+        print(f"API Auth check para {request.endpoint}")
         
         is_authenticated = AuthService.is_authenticated()
-        print(f"ðŸ” API Auth resultado: {is_authenticated}")
+        print(f"API Auth resultado: {is_authenticated}")
         
         if not is_authenticated:
             # Retorna uma resposta JSON padronizada para falha de autenticação
@@ -64,22 +64,22 @@ def api_auth_required(f):
 # Mantenha os decoradores existentes abaixo, que são para UI:
 def login_required_v2(f):
     """
-    Decorator para autenticação da nova arquitetura - VERSÃƒO FINAL
+    Decorator para autenticação da nova arquitetura - VERSÃO FINAL
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        print(f"ï¿½ï¿½ Verificando autenticação para {request.endpoint}")
-        print(f"ðŸ” Request path: {request.path}")
-        print(f"ðŸ” Request headers: {dict(request.headers)}")
-        print(f"ï¿½ï¿½ Is JSON: {request.is_json}")
-        print(f"ï¿½ï¿½ Content-Type: {request.content_type}")
-        print(f"ðŸ” Accept: {request.headers.get('Accept', '')}")
+        print(f"Verificando autenticação para {request.endpoint}")
+        print(f"Request path: {request.path}")
+        print(f"Request headers: {dict(request.headers)}")
+        print(f"Is JSON: {request.is_json}")
+        print(f"Content-Type: {request.content_type}")
+        print(f"Accept: {request.headers.get('Accept', '')}")
         
         is_authenticated = AuthService.is_authenticated()
-        print(f"ðŸ” Resultado da verificação: {is_authenticated}")
+        print(f"Resultado da verificação: {is_authenticated}")
         
         if not is_authenticated:
-            print(f"âŒ UsuÃ¡rio não autenticado, bloqueando acesso")
+            print(f"Usuário não autenticado, bloqueando acesso")
             
             is_api_request = (
                 request.is_json or 
@@ -89,7 +89,7 @@ def login_required_v2(f):
                 'application/json' in request.headers.get('Content-Type', '')
             )
             
-            print(f"ðŸ” Ã‰ requisição de API: {is_api_request}")
+            print(f"Requisição de API: {is_api_request}")
             
             if is_api_request:
                 return jsonify({
@@ -103,16 +103,16 @@ def login_required_v2(f):
                     }
                 }), 401
             else:
-                flash('VocÃª precisa fazer login para acessar esta pÃ¡gina.', 'warning')
+                flash('Você precisa fazer login para acessar esta página.', 'warning')
                 return redirect(url_for('auth.login', next=request.url))
         
-        print(f"âœ… UsuÃ¡rio autenticado, permitindo acesso")
+        print(f"Usuário autenticado, permitindo acesso")
         return f(*args, **kwargs)
     return decorated_function
 
 def admin_required_v2(f):
     """
-    Decorator para verificar se Ã© admin (futuro)
+    Decorator para verificar se é admin (futuro)
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):

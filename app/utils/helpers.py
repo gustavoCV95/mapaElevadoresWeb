@@ -10,7 +10,7 @@ def format_datetime(value, format='%Y-%m-%d %H:%M:%S'):
     return value.strftime(format)
 
 def is_valid_email(email):
-    """Valida se o email fornecido tem um formato vÃ¡lido"""
+    """Valida se o email fornecido tem um formato válido"""
     import re
     pattern = r'^[\w\.-]+@[\w\.-]+\.\w+'
     return re.match(pattern, email) is not None
@@ -37,7 +37,7 @@ def safe_str(value, default=''):
         return default
 
 def validate_coordinates(lat, lon):
-    """Valida se as coordenadas são vÃ¡lidas"""
+    """Valida se as coordenadas são válidas"""
     try:
         lat_float = float(lat)
         lon_float = float(lon)
