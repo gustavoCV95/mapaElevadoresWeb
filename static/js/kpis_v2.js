@@ -732,7 +732,7 @@ function atualizarTabelaResumo(resumo) {
 }
 
 function limparFiltrosKPIs() {
-    // ðŸ“… LIMPA TODOS OS FILTROS (incluindo datas)
+    // LIMPA TODOS OS FILTROS (incluindo datas)
     document.getElementById('data-inicio').value = '';
     document.getElementById('data-fim').value = '';
     document.getElementById('filtro-periodo').value = '';
@@ -759,7 +759,7 @@ function limparFiltrosKPIs() {
     // Limpa tabela de resumo
     document.getElementById('tabela-resumo').innerHTML = '<p class="text-muted text-center">Use os filtros acima ou clique nos grÃ¡ficos para ver dados especÃ­ficos.</p>';
     
-    console.log('ðŸ§¹ Filtros de KPIs limpos');
+    console.log('Filtros de KPIs limpos');
 }
 
 function atualizarDados() {

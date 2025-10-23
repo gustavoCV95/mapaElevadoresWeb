@@ -2,10 +2,11 @@
 
 // ========== FASE 5: FILTROS INTERATIVOS ==========
 
-// VariÃ¡veis globais
+// Variáveis globais
 let dadosOriginais = initialGeojsonData;
 let mapaLeaflet = null;
 let marcadoresAtuais = []; // NOVO: Controla marcadores atuais
+let stats_detalhadas_inicial = initialDetailedStats
 
 // Inicializa o mapa
 function inicializarMapa() {
@@ -16,7 +17,7 @@ function inicializarMapa() {
     console.log('Tamanho interno do mapa Leaflet (mapaLeaflet._size):', mapaLeaflet._size);
     
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: 'Â© OpenStreetMap contributors, Â© CartoDB'
+        attribution: '© OpenStreetMap contributors, © CartoDB'
     }).addTo(mapaLeaflet);
     
     adicionarMarcadores(dadosOriginais);
@@ -134,10 +135,10 @@ function aplicarFiltros() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Atualiza estatÃ­sticas
+                // Atualiza estaí­sticas
                 atualizarCards(data.data.stats);
                 
-                // NOVO: Atualiza estatÃ­sticas detalhadas
+                // NOVO: Atualiza estatísticas detalhadas
                 if (data.data.stats_detalhadas) {
                     atualizarStatsDetalhadas(data.data.stats_detalhadas);
                 }
@@ -192,7 +193,7 @@ function obterSelecionados(categoria) {
     return Array.from(checkboxes).map(cb => cb.value);
 }
 
-// Atualiza cards de estatÃ­sticas
+// Atualiza cards de estatí­sticas
 function atualizarCards(stats) {
     const elementos = {
         'stat-predios': stats.total_predios || 0,
@@ -207,7 +208,7 @@ function atualizarCards(stats) {
     for (let id in elementos) {
         const elem = document.getElementById(id);
         if (elem) {
-            // âœ… NOVO: Animação nos nÃºmeros
+            // NOVO: Animação nos números
             animarNumero(elem, parseInt(elem.textContent) || 0, elementos[id]);
         }
     }
@@ -217,7 +218,7 @@ function atualizarCards(stats) {
     document.getElementById('total-locais-filtro').textContent = stats.total_predios || 0;
 }
 
-// âœ… NOVO: Animação de nÃºmeros
+// NOVO: Animação de números
 function animarNumero(elemento, valorInicial, valorFinal) {
     const duracao = 500; // ms
     const passos = 20;
@@ -238,14 +239,14 @@ function animarNumero(elemento, valorInicial, valorFinal) {
     }, duracao / passos);
 }
 
-// âœ… NOVO: Seleciona todos os filtros
+// NOVO: Seleciona todos os filtros
 function selecionarTodos() {
     console.log('Selecionando todos os filtros...');
     document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
     aplicarFiltros(); // Aplica automaticamente
 }
 
-// âœ… ATUALIZADO: Limpa filtros e restaura dados originais
+// ATUALIZADO: Limpa filtros e restaura dados originais
 function limparFiltros() {
     console.log('Limpando filtros e restaurando mapa...');
     
@@ -255,20 +256,21 @@ function limparFiltros() {
     // Restaura dados originais no mapa
     adicionarMarcadores(dadosOriginais);
     
-    // Restaura estatÃ­sticas originais
+    // Restaura estatí­sticas originais
     fetch('/v2/api/dados-elevadores')
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 atualizarCards(data.data.stats);
                 ajustarZoomParaDados(data.data.geojson);
+                atualizarElevadoresParados(data.data.stats_detalhadas.elevadores_parados || []);
                 atualizarStatsDetalhadas(data.data.stats_detalhadas);
             }
         })
         .catch(error => console.error('Erro ao restaurar dados:', error));
 }
 
-// âœ… ATUALIZADO: Atualiza estatÃ­sticas detalhadas
+// ATUALIZADO: Atualiza estatí­sticas detalhadas
 function atualizarStatsDetalhadas(statsDetalhadas) {
     // Atualiza por tipo
     atualizarListaStats('stats-por-tipo', statsDetalhadas.por_tipo);
@@ -327,13 +329,23 @@ function atualizarElevadoresParados(elevadoresParados) {
     
     if (!tbody || !section) return;
     
+    // Sempre mostra a seção
+    section.style.display = 'block';
+    
+    // Se não há elevadores parados, mostra a mensagem "Nenhum elevador parado"
     if (!elevadoresParados || elevadoresParados.length === 0) {
-        section.style.display = 'none';
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center text-muted py-3">
+                    <i class="fas fa-check-circle text-success"></i> 
+                    Nenhum elevador parado
+                </td>
+            </tr>
+        `;
         return;
     }
     
-    section.style.display = 'block';
-    
+    // Se há elevadores parados, mostra a tabela normalmente
     let html = '';
     elevadoresParados.forEach(elevador => {
         html += `<tr>
@@ -398,10 +410,12 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(function() {
                 inicializarMapa();
                 configurarFiltrosAutomaticos();
+                atualizarElevadoresParados(stats_detalhadas_inicial.elevadores_parados || []);
             }, 100); // Pequeno delay
         } else {
             inicializarMapa();
             configurarFiltrosAutomaticos();
+            atualizarElevadoresParados(stats_detalhadas_inicial.elevadores_parados || []);
         }
     } else {
         console.error('Elemento #mapa não encontrado no DOM!');

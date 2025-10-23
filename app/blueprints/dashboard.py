@@ -73,7 +73,7 @@ def index():
         stats = data_processor.calculate_stats(elevators)
         stats_detalhadas = calcular_estatisticas_detalhadas(elevators)
         
-        print(f"âœ… Dashboard carregado: {len(elevators)} elevadores, {stats['total_predios']} prÃ©dios")
+        print(f"Dashboard carregado: {len(elevators)} elevadores, {stats['total_predios']} prÃ©dios")
         
         return render_template('v2/dashboard.html',
                              geojson_data=processed_data['geojson_data'],
@@ -96,7 +96,6 @@ def index():
                              usuario=AuthService.get_current_user())
 
 @dashboard_bp.route('/api/dados-elevadores-filtrados')
-@api_auth_required # Este Ã© um endpoint de API, entÃ£o api_auth_required Ã© mais apropriado.
 def api_dados_elevadores_filtrados():
     """API OTIMIZADA para obter dados filtrados"""
     start_time = time.time()
@@ -145,14 +144,13 @@ def api_dados_elevadores_filtrados():
     }
     
 @dashboard_bp.route('/api/dados-elevadores')
-@api_auth_required # Este Ã© um endpoint de API, entÃ£o api_auth_required Ã© mais apropriado.
 def api_dados_elevadores():
     """
     API para obter TODOS os dados de elevadores (sem filtros)
-    NOVA ROTA para suportar botÃ£o "Limpar Filtros"
+    NOVA ROTA para suportar botão "Limpar Filtros"
     """
     start_time = time.time()
-    print("ðŸ”„ API: Carregando todos os dados (sem filtros)...")
+    print("API: Carregando todos os dados (sem filtros)...")
     
     elevators, processed_data = obter_dados_cached()
     
@@ -161,9 +159,9 @@ def api_dados_elevadores():
     stats_detalhadas = calcular_estatisticas_detalhadas(elevators)
     
     elapsed_time = time.time() - start_time
-    print(f"âœ… Todos os dados carregados em {elapsed_time:.2f}s: {len(elevators)} elevadores")
+    print(f"Todos os dados carregados em {elapsed_time:.2f}s: {len(elevators)} elevadores")
     
-    # Retorna um dicionÃ¡rio, que api_auth_required (via json_response) irÃ¡ converter para JSON e lidar com erros
+    # Retorna um dicionário, que api_auth_required (via json_response) irá converter para JSON e lidar com erros
     return {
         'success': True,
         'data': {
@@ -179,9 +177,8 @@ def api_dados_elevadores():
     }
     
 @dashboard_bp.route('/atualizar-dados', methods=['POST', 'GET'])
-@api_auth_required # Este Ã© um endpoint de API, entÃ£o api_auth_required Ã© mais apropriado.
 def atualizar_dados():
-    """Atualiza cache de dados forÃ§adamente"""
+    """Atualiza cache de dados forçadamente"""
     global _dados_cache
     
     _dados_cache = {
@@ -193,7 +190,7 @@ def atualizar_dados():
     
     elevators, processed_data = obter_dados_cached()
     
-    # Retorna um dicionÃ¡rio, que api_auth_required (via json_response) irÃ¡ converter para JSON e lidar com erros
+    # Retorna um dicionário, que api_auth_required (via json_response) irÃ¡ converter para JSON e lidar com erros
     return {
         'success': True,
         'message': f'Cache limpo e dados atualizados! {len(elevators)} registros processados.',
@@ -202,8 +199,8 @@ def atualizar_dados():
 
 def calcular_estatisticas_detalhadas(elevators):
     """
-    Calcula estatÃ­sticas detalhadas CORRIGIDO
-    IMPORTANTE: Usa a mesma lÃ³gica do calculate_stats para consistÃªncia
+    Calcula estatísticas detalhadas CORRIGIDO
+    IMPORTANTE: Usa a mesma lógica do calculate_stats para consistÃªncia
     """
     from collections import defaultdict
     
@@ -216,7 +213,7 @@ def calcular_estatisticas_detalhadas(elevators):
             'elevadores_parados': []
         }
     
-    # âœ… DETECTA TIPO DE FILTRO (mesma lÃ³gica do calculate_stats)
+    # DETECTA TIPO DE FILTRO (mesma lógica do calculate_stats)
     filtro_parados = all(e.tem_elevador_parado for e in elevators)
     filtro_suspensos = all(e.status == 'Suspenso' for e in elevators)
     filtro_ativos = all(e.status == 'Em atividade' and not e.tem_elevador_parado for e in elevators)
@@ -230,9 +227,9 @@ def calcular_estatisticas_detalhadas(elevators):
     }
     
     if filtro_parados:
-        # âœ… FILTRO "PARADOS": Conta APENAS os parados
+        # FILTRO "PARADOS": Conta APENAS os parados
         for elevator in elevators:
-            # Por tipo/regiÃ£o/marca: conta apenas elevadores parados
+            # Por tipo/região/marca: conta apenas elevadores parados
             stats['por_tipo'][elevator.tipo] += elevator.n_elevador_parado
             stats['por_regiao'][elevator.regiao] += elevator.n_elevador_parado
             stats['por_marca'][elevator.marca_licitacao] += elevator.n_elevador_parado
@@ -252,7 +249,7 @@ def calcular_estatisticas_detalhadas(elevators):
             })
             
     elif filtro_suspensos:
-        # âœ… FILTRO "SUSPENSOS": Conta APENAS os suspensos
+        # FILTRO "SUSPENSOS": Conta APENAS os suspensos
         for elevator in elevators:
             stats['por_tipo'][elevator.tipo] += elevator.quantidade
             stats['por_regiao'][elevator.regiao] += elevator.quantidade
@@ -260,7 +257,7 @@ def calcular_estatisticas_detalhadas(elevators):
             stats['por_status']['Suspensos'] += elevator.quantidade
             
     elif filtro_ativos:
-        # âœ… FILTRO "ATIVOS": Conta APENAS os ativos
+        # FILTRO "ATIVOS": Conta APENAS os ativos
         for elevator in elevators:
             stats['por_tipo'][elevator.tipo] += elevator.quantidade
             stats['por_regiao'][elevator.regiao] += elevator.quantidade
@@ -268,21 +265,21 @@ def calcular_estatisticas_detalhadas(elevators):
             stats['por_status']['Em atividade'] += elevator.quantidade
             
     else:
-        # âœ… SEM FILTRO ou FILTRO MISTO: LÃ³gica completa
+        # SEM FILTRO ou FILTRO MISTO: Lógica completa
         for elevator in elevators:
-            # Por tipo/regiÃ£o/marca: soma total de elevadores
-            stats['por_tipo'][elevator.tipo] += elevator.quantidade
-            stats['por_regiao'][elevator.regiao] += elevator.quantidade
-            stats['por_marca'][elevator.marca_licitacao] += elevator.quantidade
-            
-            # Por status: lÃ³gica completa
+            # Por status: lógica completa
             if elevator.status == 'Suspenso':
                 stats['por_status']['Suspensos'] += elevator.quantidade
+                # Por tipo/região/marca: soma total de elevadores
+                stats['por_tipo'][elevator.tipo] += elevator.quantidade
+                stats['por_regiao'][elevator.regiao] += elevator.quantidade
+                stats['por_marca'][elevator.marca_licitacao] += elevator.quantidade
             elif elevator.tem_elevador_parado:
                 stats['por_status']['Parados'] += elevator.n_elevador_parado
-                ativos_deste_predio = elevator.quantidade - elevator.n_elevador_parado
-                stats['por_status']['Em atividade'] += ativos_deste_predio
-                
+                # Por tipo/região/marca: soma total de elevadores
+                stats['por_tipo'][elevator.tipo] += elevator.n_elevador_parado
+                stats['por_regiao'][elevator.regiao] += elevator.n_elevador_parado
+                stats['por_marca'][elevator.marca_licitacao] += elevator.n_elevador_parado               
                 # Detalhes dos elevadores parados
                 stats['elevadores_parados'].append({
                     'unidade': elevator.unidade,
@@ -293,28 +290,31 @@ def calcular_estatisticas_detalhadas(elevators):
                     'total_elevadores': elevator.quantidade,
                     'marca': elevator.marca_licitacao
                 })
-            else:
+            elif elevator.status == 'Em atividade' and not elevator.tem_elevador_parado:
                 stats['por_status']['Em atividade'] += elevator.quantidade
+                stats['por_tipo'][elevator.tipo] += elevator.quantidade
+                stats['por_regiao'][elevator.regiao] += elevator.quantidade
+                stats['por_marca'][elevator.marca_licitacao] += elevator.quantidade
     
     # Converte para dict normal e ordena
     for categoria in ['por_tipo', 'por_regiao', 'por_marca']:
         stats[categoria] = dict(sorted(stats[categoria].items(), key=lambda x: x[1], reverse=True))
     
-    # Status mantÃ©m ordem especÃ­fica
+    # Status mantém ordem específica
     stats['por_status'] = dict(stats['por_status'])
     
-    print(f"ðŸ“Š Stats detalhadas: {dict(stats['por_status'])}")
+    print(f"Stats detalhadas: {dict(stats['por_status'])}")
     
     return stats
 
 @dashboard_bp.route('/atualizar-dados', methods=['POST', 'GET'])
 @login_required_v2
 def atualizar_dados():
-    """Atualiza cache de dados forÃ§adamente"""
+    """Atualiza cache de dados forçadamente"""
     try:
         global _dados_cache
         
-        # âœ… OTIMIZAÃ‡ÃƒO: Limpa cache para forÃ§ar reload
+        # OTIMIZAÇÃO: Limpa cache para forçar reload
         _dados_cache = {
             'dados_raw': None,
             'processed_data': None,
@@ -322,7 +322,7 @@ def atualizar_dados():
             'timestamp': None
         }
         
-        # ForÃ§a nova obtenÃ§Ã£o
+        # Força nova obtenção
         elevators, processed_data = obter_dados_cached()
         
         return jsonify({
