@@ -18,7 +18,7 @@ def test_models():
         # Testa Elevator
         elevator_data = {
             'cidade': 'Belo Horizonte',
-            'unidade': 'FÃ³rum Central',
+            'unidade': 'Fórum Central',
             'endereco': 'Rua Teste, 123',
             'endereco_completo': 'Rua Teste, 123 - Centro',
             'tipo': 'Passageiro',
@@ -57,7 +57,7 @@ def test_data_processor():
         test_data = pd.DataFrame([
             {
                 'cidade': 'Belo Horizonte',
-                'unidade': 'FÃ³rum Central',
+                'unidade': 'Fórum Central',
                 'endereco': 'Rua Teste, 123',
                 'enderecoCompleto': 'Rua Teste, 123 - Centro',
                 'tipo': 'Passageiro',

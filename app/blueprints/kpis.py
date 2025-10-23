@@ -61,7 +61,7 @@ def obter_kpis_cached():
         'timestamp': time.time()
     })
     
-    print(f"âœ… KPIs: Cache atualizado com {len(kpis_processed_list)} registros.")
+    print(f"KPIs: Cache atualizado com {len(kpis_processed_list)} registros.")
     return kpis_processed_list, metricas_calculadas
 
 @kpis_bp.route('/')
@@ -69,7 +69,7 @@ def obter_kpis_cached():
 def index():
     """Dashboard principal de KPIs"""
     try:
-        print("ðŸ“Š KPIs: Carregando dashboard...")
+        print("KPIs: Carregando dashboard...")
         
         # Apenas chamamos obter_kpis_cached. NÃ£o precisamos da lista completa aqui,
         # apenas das mÃ©tricas iniciais para popular os cards e filtros.
@@ -84,7 +84,7 @@ def index():
         edificios_unicos = sorted(list(set(k.edificio for k in kpis_list if k.edificio)))
         equipamentos_unicos = sorted(list(set(k.equipamento for k in kpis_list if k.equipamento)))
 
-        print(f"âœ… KPIs: Dashboard carregado. Total chamados: {metricas_iniciais.get('total_chamados', 0)}")
+        print(f"KPIs: Dashboard carregado. Total chamados: {metricas_iniciais.get('total_chamados', 0)}")
         
         return render_template('v2/kpis.html',
                              metricas=metricas_iniciais,
@@ -94,7 +94,7 @@ def index():
                              usuario=AuthService.get_current_user())
                              
     except Exception as e:
-        print(f"âŒ KPIs: Erro no dashboard: {e}")
+        print(f"KPIs: Erro no dashboard: {e}")
         current_app.logger.exception(f"Erro ao carregar dashboard de KPIs: {e}") # Usando o logger
         return render_template('v2/kpis.html',
                              erro=f"Erro interno ao carregar KPIs: {str(e)}",
@@ -103,7 +103,7 @@ def index():
 @kpis_bp.route('/atualizar-kpis', methods=['POST', 'GET'])
 @api_auth_required # Protege e padroniza a resposta para esta API
 def atualizar_dados_kpis():
-    """Atualiza cache de dados de KPIs forÃ§adamente."""
+    """Atualiza cache de dados de KPIs forçadamente."""
     global _kpi_dados_cache
     
     # Limpa cache para forÃ§ar reload

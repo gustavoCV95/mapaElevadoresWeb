@@ -14,7 +14,7 @@ class AuthService:
     @staticmethod
     def authenticate(usuario: str, senha: str, ip_cliente: str) -> Tuple[bool, str]:
         """
-        Autentica usuÃ¡rio
+        Autentica usuário
         Returns: (sucesso, mensagem)
         """
         from app.utils.auth_helpers import (
@@ -39,34 +39,34 @@ class AuthService:
                 return True, f'Bem-vindo, {usuario}!'
             else:
                 registrar_tentativa_login(ip_cliente)
-                return False, 'UsuÃ¡rio ou senha incorretos.'
+                return False, 'Usuário ou senha incorretos.'
         else:
             registrar_tentativa_login(ip_cliente)
-            return False, 'UsuÃ¡rio ou senha incorretos.'
+            return False, 'Usuário ou senha incorretos.'
     
     @staticmethod
     def create_session(usuario: str):
-        """Cria sessão do usuÃ¡rio"""
+        """Cria sessão do usuário"""
         session['usuario_logado'] = usuario
-        session['auth_v2'] = True  # âœ… NOVO: Flag especÃ­fica para v2
+        session['auth_v2'] = True  # NOVO: Flag especÃ­fica para v2
         brt = pytz.timezone("America/Sao_Paulo")
         session['login_timestamp'] = datetime.now(brt).isoformat()
         session.permanent = True
-        print(f"ðŸ”‘ Sessão criada para {usuario} - auth_v2: {session.get('auth_v2')}")
+        print(f"Sessão criada para {usuario} - auth_v2: {session.get('auth_v2')}")
     
     @staticmethod
     def logout() -> str:
-        """Faz logout do usuÃ¡rio"""
-        usuario = session.get('usuario_logado', 'UsuÃ¡rio')
-        print(f"ðŸšª Logout do usuÃ¡rio: {usuario}")
+        """Faz logout do usuário"""
+        usuario = session.get('usuario_logado', 'Usuário')
+        print(f"Logout do usuário: {usuario}")
         session.clear()
-        return f'Logout realizado. AtÃ© logo, {usuario}!'
+        return f'Logout realizado. Até logo, {usuario}!'
     
     @staticmethod
     def is_authenticated() -> bool:
         """
-        Verifica se usuÃ¡rio estÃ¡ autenticado
-        âœ… CORRIGIDO: Verificação mais robusta
+        Verifica se usuário está autenticado
+        CORRIGIDO: Verificação mais robusta
         """
         # Verifica se tem usuÃ¡rio logado E flag auth_v2
         has_user = 'usuario_logado' in session and session.get('usuario_logado')
@@ -74,7 +74,7 @@ class AuthService:
         
         is_auth = has_user and has_auth_flag
         
-        print(f"ðŸ” Verificando autenticação:")
+        print(f"Verificando autenticação:")
         print(f"   - usuario_logado: {session.get('usuario_logado')}")
         print(f"   - auth_v2 flag: {session.get('auth_v2')}")
         print(f"   - is_authenticated: {is_auth}")
@@ -83,7 +83,7 @@ class AuthService:
     
     @staticmethod
     def get_current_user() -> str:
-        """Retorna usuÃ¡rio atual"""
+        """Retorna usuário atual"""
         if AuthService.is_authenticated():
             return session.get('usuario_logado', '')
         return ''

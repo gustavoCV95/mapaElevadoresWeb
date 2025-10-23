@@ -8,7 +8,7 @@ test_auth_bp = Blueprint('test_auth', __name__, url_prefix='/test/auth')
 @test_auth_bp.route('/debug-session')
 @api_auth_required # Protege este endpoint que revela informaÃ§Ãµes de sessÃ£o e padroniza a saÃ­da JSON
 def debug_session():
-    """Debug completo da sessÃ£o"""
+    """Debug completo da sessão"""
     # Retorna um dicionÃ¡rio, api_auth_required (via json_response) irÃ¡ jsonify
     return {
         'session_data': dict(session),
@@ -24,11 +24,11 @@ def debug_session():
 @test_auth_bp.route('/public')
 @json_response # Endpoint pÃºblico, mas que deve ter resposta JSON padronizada
 def public_endpoint():
-    """Endpoint pÃºblico (sem autenticaÃ§Ã£o)"""
+    """Endpoint público (sem autenticação)"""
     # Retorna um dicionÃ¡rio, json_response irÃ¡ jsonify
     return {
         'status': 'OK',
-        'message': 'Endpoint pÃºblico funcionando',
+        'message': 'Endpoint público funcionando',
         'authenticated': AuthService.is_authenticated(),
         'user': AuthService.get_current_user() if AuthService.is_authenticated() else None,
         'session_info': {
@@ -41,7 +41,7 @@ def public_endpoint():
 @test_auth_bp.route('/protected')
 @login_required_v2 # Endpoint protegido de UI (embora retorne JSON, o propÃ³sito do teste Ã© UI-like protection)
 def protected_endpoint():
-    """Endpoint protegido (com autenticaÃ§Ã£o)"""
+    """Endpoint protegido (com autenticação)"""
     return jsonify({ # JÃ¡ retorna jsonify, entÃ£o json_response nÃ£o Ã© estritamente necessÃ¡rio aqui se login_required_v2 cuida apenas do auth.
         'status': 'OK',
         'message': 'Endpoint protegido acessado com sucesso!',
@@ -77,11 +77,11 @@ def login_test():
     senha = data.get('senha')
     ip_cliente = request.environ.get('REMOTE_ADDR', 'test')
     
-    print(f"ðŸ”‘ Tentativa de login: {usuario}")
+    print(f"Tentativa de login: {usuario}")
     
     sucesso, mensagem = AuthService.authenticate(usuario, senha, ip_cliente)
     
-    print(f"ðŸ”‘ Resultado do login: {sucesso}")
+    print(f"Resultado do login: {sucesso}")
     
     # Retorna um dicionÃ¡rio, json_response irÃ¡ jsonify
     return {
@@ -99,7 +99,7 @@ def login_test():
 @json_response # Endpoint de API para logout, nÃ£o protegido por auth_required, mas precisa de JSON padronizado
 def logout_test():
     """Endpoint para testar logout via API"""
-    print(f"ðŸšª Tentativa de logout")
+    print(f"Tentativa de logout")
     mensagem = AuthService.logout()
     
     # Retorna um dicionÃ¡rio, json_response irÃ¡ jsonify
@@ -115,7 +115,7 @@ def logout_test():
 @test_auth_bp.route('/session-info')
 @api_auth_required # Este endpoint revela informaÃ§Ãµes de sessÃ£o, entÃ£o deve ser protegido.
 def session_info():
-    """InformaÃ§Ãµes da sessÃ£o atual"""
+    """Informações da sessão atual"""
     # Retorna um dicionÃ¡rio, api_auth_required (via json_response) irÃ¡ jsonify
     return {
         'session_data': dict(session),

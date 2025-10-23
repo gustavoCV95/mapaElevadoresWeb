@@ -17,7 +17,7 @@ def login():
     return render_template_string(LOGIN_TEMPLATE)
 
 def handle_login_form():
-    """Processa login via formulÃ¡rio"""
+    """Processa login via formulário"""
     usuario = request.form.get('usuario', '').strip()
     senha = request.form.get('senha', '')
     ip_cliente = request.environ.get('REMOTE_ADDR', 'unknown')
@@ -66,7 +66,7 @@ def logout():
     mensagem = AuthService.logout()
     
     if request.is_json:
-        # Usa json_response aqui tambÃ©m, pois Ã© uma API de logout que deve ter saÃ­da padronizada
+        # Usa json_response aqui também, pois é uma API de logout que deve ter saí­da padronizada
         return json_response(lambda: {'success': True, 'message': mensagem})()
     else:
         flash(mensagem, 'info')
@@ -82,21 +82,21 @@ def logout():
 # e o dashboard real Ã© em `app/blueprints/dashboard.py` (que jÃ¡ usa `login_required_v2`).
 # Se vocÃª decidir mantÃª-lo, adicione: `@login_required_v2`.
 def dashboard():
-    """Dashboard temporÃ¡rio da nova arquitetura"""
+    """Dashboard temporário da nova arquitetura"""
     if not AuthService.is_authenticated():
         if request.is_json:
-            return jsonify({'success': False, 'message': 'NÃ£o autenticado'}), 401
+            return jsonify({'success': False, 'message': 'Não autenticado'}), 401
         else:
-            flash('VocÃª precisa fazer login.', 'warning')
+            flash('Você precisa fazer login.', 'warning')
             return redirect(url_for('auth.login'))
     
     return render_template_string(DASHBOARD_TEMPLATE, 
                                 usuario=AuthService.get_current_user())
 
 @auth_bp.route('/status')
-@api_auth_required # Agora protegida e com saÃ­da JSON padronizada
+@api_auth_required # Agora protegida e com saí­da JSON padronizada
 def auth_status():
-    """Status da autenticaÃ§Ã£o (API)"""
+    """Status da autenticação (API)"""
     # Retorna um dicionÃ¡rio, que api_auth_required (via json_response) irÃ¡ converter para JSON e lidar com erros
     return {
         'authenticated': AuthService.is_authenticated(),

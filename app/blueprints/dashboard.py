@@ -29,14 +29,14 @@ def obter_dados_cached():
     )
     
     if cache_valido and _dados_cache['elevators']:
-        print("ðŸ“¦ Usando dados do cache")
+        print("Usando dados do cache")
         return _dados_cache['elevators'], _dados_cache['processed_data']
     
     # Recarrega dados
-    print("ðŸ”„ Recarregando dados (cache expirado)")
+    print("Recarregando dados (cache expirado)")
     planilha_url = current_app.config.get('PLANILHA_URL')
     if not planilha_url:
-        raise ValueError("URL da planilha nÃ£o configurada")
+        raise ValueError("URL da planilha não configurada")
     
     sheets_service = SheetsService()
     data_processor = DataProcessor()
@@ -56,7 +56,7 @@ def obter_dados_cached():
         'timestamp': time.time()
     })
     
-    print(f"âœ… Cache atualizado: {len(elevators)} elevadores")
+    print(f"Cache atualizado: {len(elevators)} elevadores")
     return elevators, processed_data
 
 
@@ -111,7 +111,7 @@ def api_dados_elevadores_filtrados():
     print(f"API Filtros: tipos={tipos}, regioes={regioes}, situacoes={situacoes}")
     
     data_processor = DataProcessor()
-    elevators_filtered = data_processor.apply_filters(
+    elevators_filtered, situacoes_aplicadas = data_processor.apply_filters(
         elevators,
         tipos=tipos,
         regioes=regioes,
@@ -120,7 +120,7 @@ def api_dados_elevadores_filtrados():
         situacoes=situacoes
     )
     
-    stats = data_processor.calculate_stats(elevators_filtered)
+    stats = data_processor.calculate_stats(elevators_filtered, situacoes_aplicadas)
     stats_detalhadas = calcular_estatisticas_detalhadas(elevators_filtered)
     
     geojson_filtrado = criar_geojson_manual(elevators_filtered)
@@ -128,8 +128,8 @@ def api_dados_elevadores_filtrados():
     elapsed_time = time.time() - start_time
     print(f"Filtros aplicados em {elapsed_time:.2f}s: {len(elevators_filtered)} elevadores")
     
-    # Retorna um dicionÃ¡rio, que api_auth_required (via json_response) irÃ¡ converter para JSON e lidar com erros
-    return {
+    # Retorna um dicionário, que api_auth_required (via json_response) irá converter para JSON e lidar com erros
+    return jsonify({
         'success': True,
         'data': {
             'geojson': geojson_filtrado,
@@ -141,7 +141,7 @@ def api_dados_elevadores_filtrados():
                 'fonte_dados': 'cache'
             }
         }
-    }
+    })
     
 @dashboard_bp.route('/api/dados-elevadores')
 def api_dados_elevadores():
@@ -155,14 +155,14 @@ def api_dados_elevadores():
     elevators, processed_data = obter_dados_cached()
     
     data_processor = DataProcessor()
-    stats = data_processor.calculate_stats(elevators)
+    stats = data_processor.calculate_stats(elevators, [])
     stats_detalhadas = calcular_estatisticas_detalhadas(elevators)
     
     elapsed_time = time.time() - start_time
     print(f"Todos os dados carregados em {elapsed_time:.2f}s: {len(elevators)} elevadores")
     
     # Retorna um dicionário, que api_auth_required (via json_response) irá converter para JSON e lidar com erros
-    return {
+    return jsonify({
         'success': True,
         'data': {
             'geojson': processed_data['geojson_data'],
@@ -174,7 +174,7 @@ def api_dados_elevadores():
                 'fonte_dados': 'cache'
             }
         }
-    }
+    })
     
 @dashboard_bp.route('/atualizar-dados', methods=['POST', 'GET'])
 def atualizar_dados():
@@ -332,7 +332,7 @@ def atualizar_dados():
         })
         
     except Exception as e:
-        print(f"âŒ Erro ao atualizar dados: {e}")
+        print(f"Erro ao atualizar dados: {e}")
         return jsonify({
             'success': False,
             'message': f'Erro interno: {str(e)}'

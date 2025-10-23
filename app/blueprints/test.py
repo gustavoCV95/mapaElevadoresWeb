@@ -1,6 +1,6 @@
 # app/blueprints/test.py
 """
-Blueprint de teste - VERSÃƒO CORRIGIDA COM PREFIXO
+Blueprint de teste - VERSÃO CORRIGIDA COM PREFIXO
 """
 from flask import Blueprint, jsonify
 from datetime import datetime
@@ -10,7 +10,7 @@ test_bp = Blueprint('test', __name__)
 
 @test_bp.route('/')
 def index():
-    """PÃ¡gina inicial temporÃ¡ria"""
+    """Página inicial temporária"""
     return jsonify({
         'message': 'Nova arquitetura funcionando!',
         'timestamp': datetime.now().isoformat(),

@@ -19,7 +19,7 @@ class CacheService:
             'timestamp': time.time(),
             'expiration': expiration
         }
-        print(f"ðŸ“¦ Cache SET: {key} (expira em {expiration}s)")
+        print(f"Cache SET: {key} (expira em {expiration}s)")
 
     def get(self, key):
         """Recupera um valor do cache se ainda for vÃ¡lido."""
@@ -28,30 +28,30 @@ class CacheService:
             age = time.time() - entry['timestamp']
             
             if age < entry['expiration']:
-                print(f"ðŸ“¦ Cache HIT: {key} (idade: {age:.1f}s)")
+                print(f"Cache HIT: {key} (idade: {age:.1f}s)")
                 return entry['value']
             else:
                 # Expirado
-                print(f"ðŸ“¦ Cache EXPIRED: {key} (idade: {age:.1f}s)")
+                print(f"Cache EXPIRED: {key} (idade: {age:.1f}s)")
                 del self.cache[key]
         
-        print(f"ï¿½ï¿½ Cache MISS: {key}")
+        print(f"Cache MISS: {key}")
         return None
 
     def delete(self, key):
-        """Remove uma chave especÃ­fica do cache."""
+        """Remove uma chave específica do cache."""
         if key in self.cache:
             del self.cache[key]
-            print(f"ðŸ“¦ Cache DELETE: {key}")
+            print(f"Cache DELETE: {key}")
 
     def clear(self):
         """Limpa todo o cache."""
         keys_count = len(self.cache)
         self.cache.clear()
-        print(f"ï¿½ï¿½ Cache CLEAR: {keys_count} chaves removidas")
+        print(f"Cache CLEAR: {keys_count} chaves removidas")
 
     def get_stats(self):
-        """Retorna estatÃ­sticas do cache."""
+        """Retorna estatísticas do cache."""
         now = time.time()
         active_keys = []
         expired_keys = []
@@ -78,7 +78,7 @@ class CacheService:
         }
 
     def is_expired(self, key):
-        """Verifica se uma chave especÃ­fica estÃ¡ expirada."""
+        """Verifica se uma chave específica está expirada."""
         if key not in self.cache:
             return True
         

@@ -8,21 +8,21 @@ class SheetsService:
         self.sheets_api = SheetsAPI()
     
     def obter_dados_elevadores(self, planilha_url):
-        """ObtÃ©m dados de elevadores da planilha"""
-        print(f"ðŸ”— Tentando acessar: {planilha_url}")
+        """Obtém dados de elevadores da planilha"""
+        print(f"Tentando acessar: {planilha_url}")
         return self.sheets_api.obter_dados_elevadores(planilha_url)
     
     def obter_dados_kpis(self, planilha_url):
-        """ObtÃ©m dados de KPIs da planilha"""
-        print(f"ðŸ”— Tentando acessar KPIs: {planilha_url}")
+        """Obtém dados de KPIs da planilha"""
+        print(f"Tentando acessar KPIs: {planilha_url}")
         return self.sheets_api.obter_dados_kpis(planilha_url)
     
     def get_sheet_data(self, url, range_name='A1:Z1000'):
-        """MÃ©todo genÃ©rico para obter dados de planilha"""
+        """Método genérico para obter dados de planilha"""
         # Usa o mÃ©todo apropriado baseado no contexto
         return self.sheets_api.obter_dados_elevadores(url)
     
     def update_sheet_data(self, url, range_name, values):
         """Atualiza dados na planilha (funcionalidade futura)"""
-        print(f"âš ï¸ Funcionalidade de atualização não implementada ainda")
+        print(f"Funcionalidade de atualização não implementada ainda")
         return None

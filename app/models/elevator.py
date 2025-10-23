@@ -103,7 +103,7 @@ class Elevator:
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Elevator':
-        """Cria instÃ¢ncia a partir de dicionÃ¡rio"""
+        """Cria instancia a partir de dicionário"""
         # Mapeia campos com nomes diferentes
         field_mapping = {
             'qtd_elev': 'quantidade',
