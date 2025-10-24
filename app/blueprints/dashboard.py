@@ -73,7 +73,7 @@ def index():
         stats = data_processor.calculate_stats(elevators)
         stats_detalhadas = calcular_estatisticas_detalhadas(elevators)
         
-        print(f"Dashboard carregado: {len(elevators)} elevadores, {stats['total_predios']} prÃ©dios")
+        print(f"Dashboard carregado: {len(elevators)} elevadores, {stats['total_predios']} prédios")
         
         return render_template('v2/dashboard.html',
                              geojson_data=processed_data['geojson_data'],
@@ -123,7 +123,7 @@ def api_dados_elevadores_filtrados():
     stats = data_processor.calculate_stats(elevators_filtered, situacoes_aplicadas)
     stats_detalhadas = calcular_estatisticas_detalhadas(elevators_filtered)
     
-    geojson_filtrado = criar_geojson_manual(elevators_filtered)
+    geojson_filtrado = criar_geojson_manual(elevators_filtered, situacoes)
     
     elapsed_time = time.time() - start_time
     print(f"Filtros aplicados em {elapsed_time:.2f}s: {len(elevators_filtered)} elevadores")
@@ -176,27 +176,6 @@ def api_dados_elevadores():
         }
     })
     
-@dashboard_bp.route('/atualizar-dados', methods=['POST', 'GET'])
-def atualizar_dados():
-    """Atualiza cache de dados forçadamente"""
-    global _dados_cache
-    
-    _dados_cache = {
-        'dados_raw': None,
-        'processed_data': None,
-        'elevators': None,
-        'timestamp': None
-    }
-    
-    elevators, processed_data = obter_dados_cached()
-    
-    # Retorna um dicionário, que api_auth_required (via json_response) irÃ¡ converter para JSON e lidar com erros
-    return {
-        'success': True,
-        'message': f'Cache limpo e dados atualizados! {len(elevators)} registros processados.',
-        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
-    }
-
 def calcular_estatisticas_detalhadas(elevators):
     """
     Calcula estatísticas detalhadas CORRIGIDO
@@ -338,23 +317,36 @@ def atualizar_dados():
             'message': f'Erro interno: {str(e)}'
         })
 
-def criar_geojson_manual(elevators: List[Elevator]):
+def criar_geojson_manual(elevators: List[Elevator], situacoes_filtradas: List[str] = None):
     """Cria GeoJSON otimizado"""
     features = []
+    filtered = elevators.copy()
     
-    for elevator in elevators:
+    # Filtros de situação
+    if situacoes_filtradas:
+        situacao_filtered = []
+        for situacao in situacoes_filtradas:
+            if situacao == 'suspensos':
+                situacao_filtered.extend([e for e in filtered if e.status == 'Suspenso'])
+            elif situacao == 'parados':
+                situacao_filtered.extend([e for e in filtered if e.tem_elevador_parado])
+            elif situacao == 'ativos':
+                situacao_filtered.extend([e for e in filtered if e.status == 'Em atividade' and not e.tem_elevador_parado])
+        filtered = situacao_filtered
+    
+    for elevator in filtered:
         if hasattr(elevator, 'latitude') and hasattr(elevator, 'longitude'):
             try:
                 lat = float(elevator.latitude)
                 lng = float(elevator.longitude)
                 
-                # Pula coordenadas invÃ¡lidas
+                # Pula coordenadas inválidas
                 if lat == 0 or lng == 0:
                     continue
                     
                 feature = elevator.to_geojson_feature()
 
-                # Adicione uma validaÃ§Ã£o extra caso to_geojson_feature retorne None por algum motivo
+                # Adicione uma validação extra caso to_geojson_feature retorne None por algum motivo
                 if feature:
                     features.append(feature)
 

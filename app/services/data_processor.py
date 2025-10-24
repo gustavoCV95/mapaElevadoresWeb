@@ -81,7 +81,7 @@ class DataProcessor:
                 "features": features
             }
             
-            # Extrai listas Ãºnicas
+            # Extrai listas Únicas
             tipos_unicos = sorted(list(set([e.tipo for e in elevators])))
             regioes_unicas = sorted(list(set([e.regiao for e in elevators])))
             marcas_unicas = sorted(list(set([e.marca_licitacao for e in elevators])))
