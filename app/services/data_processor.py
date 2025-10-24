@@ -315,9 +315,7 @@ class DataProcessor:
                 if elevator_id not in ids_vistos:
                     ids_vistos.add(elevator_id)
                     filtered.append(elevator)
-            
-        #df = pd.DataFrame(filtered)
-        #df.to_excel(r"C:\Users\gusta\OneDrive\Área de Trabalho\DadosFiltrados.xlsx",index=False)
+
         print(f"Filtros aplicados: {sum(e.quantidade for e in elevators)} -> {sum(e.quantidade for e in filtered)} elevadores")
         
         return filtered, situacoes_aplicadas
