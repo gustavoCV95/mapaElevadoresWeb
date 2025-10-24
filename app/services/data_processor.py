@@ -305,8 +305,19 @@ class DataProcessor:
                 elif situacao == 'ativos':
                     situacao_filtered.extend([e for e in filtered if e.status == 'Em atividade'])
             
-            filtered = situacao_filtered
+            def criar_id(elevator):
+                return f"{elevator.cidade}_{elevator.unidade}_{elevator.endereco}_{elevator.tipo}_{elevator.quantidade}_{elevator.paradas}_{elevator.latitude}_{elevator.longitude}"
+
+            ids_vistos = set()
+            filtered = []
+            for elevator in situacao_filtered:
+                elevator_id = criar_id(elevator)
+                if elevator_id not in ids_vistos:
+                    ids_vistos.add(elevator_id)
+                    filtered.append(elevator)
             
+        #df = pd.DataFrame(filtered)
+        #df.to_excel(r"C:\Users\gusta\OneDrive\Área de Trabalho\DadosFiltrados.xlsx",index=False)
         print(f"Filtros aplicados: {sum(e.quantidade for e in elevators)} -> {sum(e.quantidade for e in filtered)} elevadores")
         
         return filtered, situacoes_aplicadas
