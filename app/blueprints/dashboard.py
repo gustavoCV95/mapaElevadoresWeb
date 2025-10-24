@@ -59,7 +59,6 @@ def obter_dados_cached():
     print(f"Cache atualizado: {len(elevators)} elevadores")
     return elevators, processed_data
 
-
 @dashboard_bp.route('/')
 @dashboard_bp.route('/dashboard')
 @login_required_v2 # Este é um endpoint de UI (renderiza HTML), então login_required_v2 é apropriado.
@@ -71,7 +70,7 @@ def index():
         
         data_processor = DataProcessor()
         stats = data_processor.calculate_stats(elevators)
-        stats_detalhadas = calcular_estatisticas_detalhadas(elevators)
+        stats_detalhadas = data_processor.calcular_estatisticas_detalhadas(elevators)
         
         print(f"Dashboard carregado: {len(elevators)} elevadores, {stats['total_predios']} prédios")
         
@@ -121,9 +120,9 @@ def api_dados_elevadores_filtrados():
     )
     
     stats = data_processor.calculate_stats(elevators_filtered, situacoes_aplicadas)
-    stats_detalhadas = calcular_estatisticas_detalhadas(elevators_filtered)
+    stats_detalhadas = data_processor.calcular_estatisticas_detalhadas(elevators_filtered)
     
-    geojson_filtrado = criar_geojson_manual(elevators_filtered, situacoes)
+    geojson_filtrado = data_processor.criar_geojson_manual(elevators_filtered, situacoes)
     
     elapsed_time = time.time() - start_time
     print(f"Filtros aplicados em {elapsed_time:.2f}s: {len(elevators_filtered)} elevadores")
@@ -156,7 +155,7 @@ def api_dados_elevadores():
     
     data_processor = DataProcessor()
     stats = data_processor.calculate_stats(elevators, [])
-    stats_detalhadas = calcular_estatisticas_detalhadas(elevators)
+    stats_detalhadas = data_processor.calcular_estatisticas_detalhadas(elevators)
     
     elapsed_time = time.time() - start_time
     print(f"Todos os dados carregados em {elapsed_time:.2f}s: {len(elevators)} elevadores")
@@ -176,116 +175,6 @@ def api_dados_elevadores():
         }
     })
     
-def calcular_estatisticas_detalhadas(elevators):
-    """
-    Calcula estatísticas detalhadas CORRIGIDO
-    IMPORTANTE: Usa a mesma lógica do calculate_stats para consistÃªncia
-    """
-    from collections import defaultdict
-    
-    if not elevators:
-        return {
-            'por_tipo': {},
-            'por_regiao': {},
-            'por_marca': {},
-            'por_status': {},
-            'elevadores_parados': []
-        }
-    
-    # DETECTA TIPO DE FILTRO (mesma lógica do calculate_stats)
-    filtro_parados = all(e.tem_elevador_parado for e in elevators)
-    filtro_suspensos = all(e.status == 'Suspenso' for e in elevators)
-    filtro_ativos = all(e.status == 'Em atividade' and not e.tem_elevador_parado for e in elevators)
-    
-    stats = {
-        'por_tipo': defaultdict(int),
-        'por_regiao': defaultdict(int),
-        'por_marca': defaultdict(int),
-        'por_status': defaultdict(int),
-        'elevadores_parados': []
-    }
-    
-    if filtro_parados:
-        # FILTRO "PARADOS": Conta APENAS os parados
-        for elevator in elevators:
-            # Por tipo/região/marca: conta apenas elevadores parados
-            stats['por_tipo'][elevator.tipo] += elevator.n_elevador_parado
-            stats['por_regiao'][elevator.regiao] += elevator.n_elevador_parado
-            stats['por_marca'][elevator.marca_licitacao] += elevator.n_elevador_parado
-            
-            # Por status: apenas parados
-            stats['por_status']['Parados'] += elevator.n_elevador_parado
-            
-            # Detalhes dos elevadores parados
-            stats['elevadores_parados'].append({
-                'unidade': elevator.unidade,
-                'cidade': elevator.cidade,
-                'tipo': elevator.tipo,
-                'regiao': elevator.regiao,
-                'quantidade_parada': elevator.n_elevador_parado,
-                'total_elevadores': elevator.quantidade,
-                'marca': elevator.marca_licitacao
-            })
-            
-    elif filtro_suspensos:
-        # FILTRO "SUSPENSOS": Conta APENAS os suspensos
-        for elevator in elevators:
-            stats['por_tipo'][elevator.tipo] += elevator.quantidade
-            stats['por_regiao'][elevator.regiao] += elevator.quantidade
-            stats['por_marca'][elevator.marca_licitacao] += elevator.quantidade
-            stats['por_status']['Suspensos'] += elevator.quantidade
-            
-    elif filtro_ativos:
-        # FILTRO "ATIVOS": Conta APENAS os ativos
-        for elevator in elevators:
-            stats['por_tipo'][elevator.tipo] += elevator.quantidade
-            stats['por_regiao'][elevator.regiao] += elevator.quantidade
-            stats['por_marca'][elevator.marca_licitacao] += elevator.quantidade
-            stats['por_status']['Em atividade'] += elevator.quantidade
-            
-    else:
-        # SEM FILTRO ou FILTRO MISTO: Lógica completa
-        for elevator in elevators:
-            # Por status: lógica completa
-            if elevator.status == 'Suspenso':
-                stats['por_status']['Suspensos'] += elevator.quantidade
-                # Por tipo/região/marca: soma total de elevadores
-                stats['por_tipo'][elevator.tipo] += elevator.quantidade
-                stats['por_regiao'][elevator.regiao] += elevator.quantidade
-                stats['por_marca'][elevator.marca_licitacao] += elevator.quantidade
-            elif elevator.tem_elevador_parado:
-                stats['por_status']['Parados'] += elevator.n_elevador_parado
-                # Por tipo/região/marca: soma total de elevadores
-                stats['por_tipo'][elevator.tipo] += elevator.n_elevador_parado
-                stats['por_regiao'][elevator.regiao] += elevator.n_elevador_parado
-                stats['por_marca'][elevator.marca_licitacao] += elevator.n_elevador_parado               
-                # Detalhes dos elevadores parados
-                stats['elevadores_parados'].append({
-                    'unidade': elevator.unidade,
-                    'cidade': elevator.cidade,
-                    'tipo': elevator.tipo,
-                    'regiao': elevator.regiao,
-                    'quantidade_parada': elevator.n_elevador_parado,
-                    'total_elevadores': elevator.quantidade,
-                    'marca': elevator.marca_licitacao
-                })
-            elif elevator.status == 'Em atividade' and not elevator.tem_elevador_parado:
-                stats['por_status']['Em atividade'] += elevator.quantidade
-                stats['por_tipo'][elevator.tipo] += elevator.quantidade
-                stats['por_regiao'][elevator.regiao] += elevator.quantidade
-                stats['por_marca'][elevator.marca_licitacao] += elevator.quantidade
-    
-    # Converte para dict normal e ordena
-    for categoria in ['por_tipo', 'por_regiao', 'por_marca']:
-        stats[categoria] = dict(sorted(stats[categoria].items(), key=lambda x: x[1], reverse=True))
-    
-    # Status mantém ordem específica
-    stats['por_status'] = dict(stats['por_status'])
-    
-    print(f"Stats detalhadas: {dict(stats['por_status'])}")
-    
-    return stats
-
 @dashboard_bp.route('/atualizar-dados', methods=['POST', 'GET'])
 @login_required_v2
 def atualizar_dados():
@@ -316,44 +205,3 @@ def atualizar_dados():
             'success': False,
             'message': f'Erro interno: {str(e)}'
         })
-
-def criar_geojson_manual(elevators: List[Elevator], situacoes_filtradas: List[str] = None):
-    """Cria GeoJSON otimizado"""
-    features = []
-    filtered = elevators.copy()
-    
-    # Filtros de situação
-    if situacoes_filtradas:
-        situacao_filtered = []
-        for situacao in situacoes_filtradas:
-            if situacao == 'suspensos':
-                situacao_filtered.extend([e for e in filtered if e.status == 'Suspenso'])
-            elif situacao == 'parados':
-                situacao_filtered.extend([e for e in filtered if e.tem_elevador_parado])
-            elif situacao == 'ativos':
-                situacao_filtered.extend([e for e in filtered if e.status == 'Em atividade' and not e.tem_elevador_parado])
-        filtered = situacao_filtered
-    
-    for elevator in filtered:
-        if hasattr(elevator, 'latitude') and hasattr(elevator, 'longitude'):
-            try:
-                lat = float(elevator.latitude)
-                lng = float(elevator.longitude)
-                
-                # Pula coordenadas inválidas
-                if lat == 0 or lng == 0:
-                    continue
-                    
-                feature = elevator.to_geojson_feature()
-
-                # Adicione uma validação extra caso to_geojson_feature retorne None por algum motivo
-                if feature:
-                    features.append(feature)
-
-            except (ValueError, TypeError):
-                continue
-    
-    return {
-        "type": "FeatureCollection",
-        "features": features
-    }

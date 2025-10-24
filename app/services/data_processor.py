@@ -110,6 +110,306 @@ class DataProcessor:
             'predios_unicos': []
         }
 
+    def apply_filters(self, elevators: List[Elevator], tipos=None, regioes=None, 
+                    marcas=None, empresas=None, situacoes=None) -> tuple[List[Elevator], List[str]]:
+        """
+        Aplica filtros aos elevadores
+        RESPONSABILIDADE: Apenas filtrar dados, sem lógica de cálculo
+        RETORNA: (elevators_filtrados, situacoes_aplicadas)
+        """
+        filtered = elevators.copy()
+        
+        # Filtros básicos
+        if tipos:
+            filtered = [e for e in filtered if e.tipo in tipos]
+        
+        if regioes:
+            filtered = [e for e in filtered if e.regiao in regioes]
+        
+        if marcas:
+            filtered = [e for e in filtered if e.marca_licitacao in marcas]
+        
+        if empresas:
+            filtered = [e for e in filtered if e.empresa in empresas]
+        
+        situacoes_aplicadas = situacoes or []
+        
+        # Filtros de situação
+        if situacoes:
+            situacao_filtered = []
+            for situacao in situacoes:
+                if situacao == 'suspensos':
+                    situacao_filtered.extend([e for e in filtered if e.status == 'Suspenso'])
+                elif situacao == 'parados':
+                    situacao_filtered.extend([e for e in filtered if e.tem_elevador_parado])
+                elif situacao == 'ativos':
+                    situacao_filtered.extend([e for e in filtered if e.status == 'Em atividade'])
+            
+            def criar_id(elevator):
+                return f"{elevator.cidade}_{elevator.unidade}_{elevator.endereco}_{elevator.tipo}_{elevator.quantidade}_{elevator.paradas}_{elevator.latitude}_{elevator.longitude}"
+
+            ids_vistos = set()
+            filtered = []
+            for elevator in situacao_filtered:
+                elevator_id = criar_id(elevator)
+                if elevator_id not in ids_vistos:
+                    ids_vistos.add(elevator_id)
+                    filtered.append(elevator)
+
+        print(f"Filtros aplicados: {sum(e.quantidade for e in elevators)} -> {sum(e.quantidade for e in filtered)} elevadores")
+        
+        return filtered, situacoes_aplicadas
+
+    def calculate_stats(self, elevators: List[Elevator], situacoes_filtradas: List[str] = None) -> Dict[str, Any]:
+        """
+        Calcula estatísticas dos elevadores
+        RESPONSABILIDADE: Apenas calcular, assumindo que dados já estão filtrados
+        """
+        if not elevators:
+            return {
+                'total_elevadores': 0,
+                'total_predios': 0,
+                'cidades': 0,
+                'regioes': 0,
+                'em_atividade': 0,
+                'elevadores_suspensos': 0,
+                'elevadores_parados': 0
+            }
+        
+        situacoes_filtradas = situacoes_filtradas or []
+        
+        # Contadores
+        total_elevadores = 0
+        elevadores_suspensos = 0
+        elevadores_parados = 0
+        elevadores_ativos = 0
+        
+        # Lógica de cálculo baseada nos filtros aplicados
+        if situacoes_filtradas == ['parados']:
+            # FILTRO "PARADOS" ÚNICO: Conta APENAS os parados
+            for elevator in elevators:
+                elevadores_parados += elevator.n_elevador_parado
+            total_elevadores = elevadores_parados
+            
+        elif situacoes_filtradas == ['suspensos']:
+            # FILTRO "SUSPENSOS" ÚNICO: Conta APENAS os suspensos
+            for elevator in elevators:
+                elevadores_suspensos += elevator.quantidade
+            total_elevadores = elevadores_suspensos
+            
+        elif situacoes_filtradas == ['ativos']:
+            # FILTRO "ATIVOS" ÚNICO: Conta APENAS os ativos
+            for elevator in elevators:
+                ativos_neste_predio = elevator.quantidade - elevator.n_elevador_parado
+                elevadores_ativos += ativos_neste_predio
+            total_elevadores = elevadores_ativos
+        
+        elif set(situacoes_filtradas) == {'ativos', 'suspensos'}:
+            # FILTRO MISTO: "ATIVOS" + "SUSPENSOS"
+            for elevator in elevators:
+                if elevator.status == 'Suspenso':
+                    elevadores_suspensos += elevator.quantidade
+                    total_elevadores += elevator.quantidade
+                else:  # Em atividade
+                    ativos_neste_predio = elevator.quantidade - elevator.n_elevador_parado
+                    elevadores_ativos += ativos_neste_predio
+                    total_elevadores += ativos_neste_predio
+        
+        elif set(situacoes_filtradas) == {'ativos', 'parados'}:
+            # FILTRO MISTO: "ATIVOS" + "PARADOS"
+            for elevator in elevators:
+                ativos_neste_predio = elevator.quantidade - elevator.n_elevador_parado
+                elevadores_ativos += ativos_neste_predio
+                elevadores_parados += elevator.n_elevador_parado
+                total_elevadores += elevator.quantidade
+        
+        elif set(situacoes_filtradas) == {'parados', 'suspensos'}:
+            # FILTRO MISTO: "PARADOS" + "SUSPENSOS"
+            for elevator in elevators:
+                if elevator.status == 'Suspenso':
+                    elevadores_suspensos += elevator.quantidade
+                    total_elevadores += elevator.quantidade
+                else:  # Em atividade com parados
+                    elevadores_parados += elevator.n_elevador_parado
+                    total_elevadores += elevator.n_elevador_parado
+        
+        else:
+            # SEM FILTRO ou FILTRO COMPLETO: Lógica completa
+            for elevator in elevators:                
+                if elevator.status == 'Suspenso':
+                    elevadores_suspensos += elevator.quantidade
+                    total_elevadores += elevator.quantidade
+                else:
+                    elevadores_ativos += elevator.quantidade - elevator.n_elevador_parado
+                    elevadores_parados += elevator.n_elevador_parado
+                    total_elevadores += elevator.quantidade
+        
+        # Estatísticas gerais (sempre calculadas sobre dados filtrados)
+        stats = {
+            'total_elevadores': total_elevadores,
+            'total_predios': len(set(e.endereco_completo for e in elevators)),
+            'cidades': len(set(e.cidade for e in elevators)),
+            'regioes': len(set(e.regiao for e in elevators)),
+            'em_atividade': elevadores_ativos,
+            'elevadores_suspensos': elevadores_suspensos,
+            'elevadores_parados': elevadores_parados
+        }
+        
+        print(f"Stats calculados: Total={total_elevadores}, Ativos={elevadores_ativos}, Suspensos={elevadores_suspensos}, Parados={elevadores_parados}")
+        
+        return stats
+
+    def calcular_estatisticas_detalhadas(self, elevators: List[Elevator], situacoes_filtradas: List[str] = None) -> Dict[str, Any]:
+        """
+        Calcula estatísticas detalhadas CORRIGIDO
+        IMPORTANTE: Usa a mesma lógica do calculate_stats para consistÃªncia
+        """
+        from collections import defaultdict
+        
+        if not elevators:
+            return {
+                'por_tipo': {},
+                'por_regiao': {},
+                'por_marca': {},
+                'por_status': {},
+                'elevadores_parados': []
+            }
+        
+        # DETECTA TIPO DE FILTRO (mesma lógica do calculate_stats)
+        filtro_parados = all(e.tem_elevador_parado for e in elevators)
+        filtro_suspensos = all(e.status == 'Suspenso' for e in elevators)
+        filtro_ativos = all(e.status == 'Em atividade' and not e.tem_elevador_parado for e in elevators)
+        
+        stats = {
+            'por_tipo': defaultdict(int),
+            'por_regiao': defaultdict(int),
+            'por_marca': defaultdict(int),
+            'por_status': defaultdict(int),
+            'elevadores_parados': []
+        }
+        
+        if filtro_parados:
+            # FILTRO "PARADOS": Conta APENAS os parados
+            for elevator in elevators:
+                # Por tipo/região/marca: conta apenas elevadores parados
+                stats['por_tipo'][elevator.tipo] += elevator.n_elevador_parado
+                stats['por_regiao'][elevator.regiao] += elevator.n_elevador_parado
+                stats['por_marca'][elevator.marca_licitacao] += elevator.n_elevador_parado
+                
+                # Por status: apenas parados
+                stats['por_status']['Parados'] += elevator.n_elevador_parado
+                
+                # Detalhes dos elevadores parados
+                stats['elevadores_parados'].append({
+                    'unidade': elevator.unidade,
+                    'cidade': elevator.cidade,
+                    'tipo': elevator.tipo,
+                    'regiao': elevator.regiao,
+                    'quantidade_parada': elevator.n_elevador_parado,
+                    'total_elevadores': elevator.quantidade,
+                    'marca': elevator.marca_licitacao
+                })
+                
+        elif filtro_suspensos:
+            # FILTRO "SUSPENSOS": Conta APENAS os suspensos
+            for elevator in elevators:
+                stats['por_tipo'][elevator.tipo] += elevator.quantidade
+                stats['por_regiao'][elevator.regiao] += elevator.quantidade
+                stats['por_marca'][elevator.marca_licitacao] += elevator.quantidade
+                stats['por_status']['Suspensos'] += elevator.quantidade
+                
+        elif filtro_ativos:
+            # FILTRO "ATIVOS": Conta APENAS os ativos
+            for elevator in elevators:
+                stats['por_tipo'][elevator.tipo] += elevator.quantidade
+                stats['por_regiao'][elevator.regiao] += elevator.quantidade
+                stats['por_marca'][elevator.marca_licitacao] += elevator.quantidade
+                stats['por_status']['Em atividade'] += elevator.quantidade
+                
+        else:
+            # SEM FILTRO ou FILTRO MISTO: Lógica completa
+            for elevator in elevators:
+                # Por status: lógica completa
+                if elevator.status == 'Suspenso':
+                    stats['por_status']['Suspensos'] += elevator.quantidade
+                    # Por tipo/região/marca: soma total de elevadores
+                    stats['por_tipo'][elevator.tipo] += elevator.quantidade
+                    stats['por_regiao'][elevator.regiao] += elevator.quantidade
+                    stats['por_marca'][elevator.marca_licitacao] += elevator.quantidade
+                elif elevator.tem_elevador_parado:
+                    stats['por_status']['Parados'] += elevator.n_elevador_parado
+                    # Por tipo/região/marca: soma total de elevadores
+                    stats['por_tipo'][elevator.tipo] += elevator.n_elevador_parado
+                    stats['por_regiao'][elevator.regiao] += elevator.n_elevador_parado
+                    stats['por_marca'][elevator.marca_licitacao] += elevator.n_elevador_parado               
+                    # Detalhes dos elevadores parados
+                    stats['elevadores_parados'].append({
+                        'unidade': elevator.unidade,
+                        'cidade': elevator.cidade,
+                        'tipo': elevator.tipo,
+                        'regiao': elevator.regiao,
+                        'quantidade_parada': elevator.n_elevador_parado,
+                        'total_elevadores': elevator.quantidade,
+                        'marca': elevator.marca_licitacao
+                    })
+                elif elevator.status == 'Em atividade' and not elevator.tem_elevador_parado:
+                    stats['por_status']['Em atividade'] += elevator.quantidade
+                    stats['por_tipo'][elevator.tipo] += elevator.quantidade
+                    stats['por_regiao'][elevator.regiao] += elevator.quantidade
+                    stats['por_marca'][elevator.marca_licitacao] += elevator.quantidade
+        
+        # Converte para dict normal e ordena
+        for categoria in ['por_tipo', 'por_regiao', 'por_marca']:
+            stats[categoria] = dict(sorted(stats[categoria].items(), key=lambda x: x[1], reverse=True))
+        
+        # Status mantém ordem específica
+        stats['por_status'] = dict(stats['por_status'])
+        
+        print(f"Stats detalhadas: {dict(stats['por_status'])}")
+        
+        return stats
+
+    def criar_geojson_manual(self, elevators: List[Elevator], situacoes_filtradas: List[str] = None):
+        """Cria GeoJSON otimizado"""
+        features = []
+        filtered = elevators.copy()
+        
+        # Filtros de situação
+        if situacoes_filtradas:
+            situacao_filtered = []
+            for situacao in situacoes_filtradas:
+                if situacao == 'suspensos':
+                    situacao_filtered.extend([e for e in filtered if e.status == 'Suspenso'])
+                elif situacao == 'parados':
+                    situacao_filtered.extend([e for e in filtered if e.tem_elevador_parado])
+                elif situacao == 'ativos':
+                    situacao_filtered.extend([e for e in filtered if e.status == 'Em atividade' and not e.tem_elevador_parado])
+            filtered = situacao_filtered
+        
+        for elevator in filtered:
+            if hasattr(elevator, 'latitude') and hasattr(elevator, 'longitude'):
+                try:
+                    lat = float(elevator.latitude)
+                    lng = float(elevator.longitude)
+                    
+                    # Pula coordenadas inválidas
+                    if lat == 0 or lng == 0:
+                        continue
+                        
+                    feature = elevator.to_geojson_feature()
+
+                    # Adicione uma validação extra caso to_geojson_feature retorne None por algum motivo
+                    if feature:
+                        features.append(feature)
+
+                except (ValueError, TypeError):
+                    continue
+        
+        return {
+            "type": "FeatureCollection",
+            "features": features
+        }
+
     def process_kpis_data(self, data: pd.DataFrame) -> Dict[str, Any]:
         """
         Processa dados de KPIs e calcula métricas
@@ -270,56 +570,6 @@ class DataProcessor:
         print(f"Métricas processadas: {len(metricas)} categorias")
         return metricas
 
-    def apply_filters(self, elevators: List[Elevator], tipos=None, regioes=None, 
-                    marcas=None, empresas=None, situacoes=None) -> tuple[List[Elevator], List[str]]:
-        """
-        Aplica filtros aos elevadores
-        RESPONSABILIDADE: Apenas filtrar dados, sem lógica de cálculo
-        RETORNA: (elevators_filtrados, situacoes_aplicadas)
-        """
-        filtered = elevators.copy()
-        
-        # Filtros básicos
-        if tipos:
-            filtered = [e for e in filtered if e.tipo in tipos]
-        
-        if regioes:
-            filtered = [e for e in filtered if e.regiao in regioes]
-        
-        if marcas:
-            filtered = [e for e in filtered if e.marca_licitacao in marcas]
-        
-        if empresas:
-            filtered = [e for e in filtered if e.empresa in empresas]
-        
-        situacoes_aplicadas = situacoes or []
-        
-        # Filtros de situação
-        if situacoes:
-            situacao_filtered = []
-            for situacao in situacoes:
-                if situacao == 'suspensos':
-                    situacao_filtered.extend([e for e in filtered if e.status == 'Suspenso'])
-                elif situacao == 'parados':
-                    situacao_filtered.extend([e for e in filtered if e.tem_elevador_parado])
-                elif situacao == 'ativos':
-                    situacao_filtered.extend([e for e in filtered if e.status == 'Em atividade'])
-            
-            def criar_id(elevator):
-                return f"{elevator.cidade}_{elevator.unidade}_{elevator.endereco}_{elevator.tipo}_{elevator.quantidade}_{elevator.paradas}_{elevator.latitude}_{elevator.longitude}"
-
-            ids_vistos = set()
-            filtered = []
-            for elevator in situacao_filtered:
-                elevator_id = criar_id(elevator)
-                if elevator_id not in ids_vistos:
-                    ids_vistos.add(elevator_id)
-                    filtered.append(elevator)
-
-        print(f"Filtros aplicados: {sum(e.quantidade for e in elevators)} -> {sum(e.quantidade for e in filtered)} elevadores")
-        
-        return filtered, situacoes_aplicadas
-
     def apply_kpi_filters(self, kpis: List['KPI'], data_inicio: datetime = None, data_fim: datetime = None, 
                           status: str = None, categoria: str = None, edificio: str = None, 
                           equipamento: str = None) -> List['KPI']:
@@ -327,8 +577,6 @@ class DataProcessor:
         Aplica filtros a uma lista de objetos KPI.
         """
         filtered_kpis = kpis
-        
-        brt = pytz.timezone("America/Sao_Paulo")
 
         if data_inicio:
             filtered_kpis = [k for k in filtered_kpis if k.data_solicitacao >= data_inicio]
@@ -350,102 +598,3 @@ class DataProcessor:
         
         print(f"KPIs: Filtros aplicados resultaram em {len(filtered_kpis)} KPIs.")
         return filtered_kpis
-
-    def calculate_stats(self, elevators: List[Elevator], situacoes_filtradas: List[str] = None) -> Dict[str, Any]:
-        """
-        Calcula estatísticas dos elevadores
-        RESPONSABILIDADE: Apenas calcular, assumindo que dados já estão filtrados
-        """
-        if not elevators:
-            return {
-                'total_elevadores': 0,
-                'total_predios': 0,
-                'cidades': 0,
-                'regioes': 0,
-                'em_atividade': 0,
-                'elevadores_suspensos': 0,
-                'elevadores_parados': 0
-            }
-        
-        situacoes_filtradas = situacoes_filtradas or []
-        
-        # Contadores
-        total_elevadores = 0
-        elevadores_suspensos = 0
-        elevadores_parados = 0
-        elevadores_ativos = 0
-        
-        # Lógica de cálculo baseada nos filtros aplicados
-        if situacoes_filtradas == ['parados']:
-            # FILTRO "PARADOS" ÚNICO: Conta APENAS os parados
-            for elevator in elevators:
-                elevadores_parados += elevator.n_elevador_parado
-            total_elevadores = elevadores_parados
-            
-        elif situacoes_filtradas == ['suspensos']:
-            # FILTRO "SUSPENSOS" ÚNICO: Conta APENAS os suspensos
-            for elevator in elevators:
-                elevadores_suspensos += elevator.quantidade
-            total_elevadores = elevadores_suspensos
-            
-        elif situacoes_filtradas == ['ativos']:
-            # FILTRO "ATIVOS" ÚNICO: Conta APENAS os ativos
-            for elevator in elevators:
-                ativos_neste_predio = elevator.quantidade - elevator.n_elevador_parado
-                elevadores_ativos += ativos_neste_predio
-            total_elevadores = elevadores_ativos
-        
-        elif set(situacoes_filtradas) == {'ativos', 'suspensos'}:
-            # FILTRO MISTO: "ATIVOS" + "SUSPENSOS"
-            for elevator in elevators:
-                if elevator.status == 'Suspenso':
-                    elevadores_suspensos += elevator.quantidade
-                    total_elevadores += elevator.quantidade
-                else:  # Em atividade
-                    ativos_neste_predio = elevator.quantidade - elevator.n_elevador_parado
-                    elevadores_ativos += ativos_neste_predio
-                    total_elevadores += ativos_neste_predio
-        
-        elif set(situacoes_filtradas) == {'ativos', 'parados'}:
-            # FILTRO MISTO: "ATIVOS" + "PARADOS"
-            for elevator in elevators:
-                ativos_neste_predio = elevator.quantidade - elevator.n_elevador_parado
-                elevadores_ativos += ativos_neste_predio
-                elevadores_parados += elevator.n_elevador_parado
-                total_elevadores += elevator.quantidade
-        
-        elif set(situacoes_filtradas) == {'parados', 'suspensos'}:
-            # FILTRO MISTO: "PARADOS" + "SUSPENSOS"
-            for elevator in elevators:
-                if elevator.status == 'Suspenso':
-                    elevadores_suspensos += elevator.quantidade
-                    total_elevadores += elevator.quantidade
-                else:  # Em atividade com parados
-                    elevadores_parados += elevator.n_elevador_parado
-                    total_elevadores += elevator.n_elevador_parado
-        
-        else:
-            # SEM FILTRO ou FILTRO COMPLETO: Lógica completa
-            for elevator in elevators:                
-                if elevator.status == 'Suspenso':
-                    elevadores_suspensos += elevator.quantidade
-                    total_elevadores += elevator.quantidade
-                else:
-                    elevadores_ativos += elevator.quantidade - elevator.n_elevador_parado
-                    elevadores_parados += elevator.n_elevador_parado
-                    total_elevadores += elevator.quantidade
-        
-        # Estatísticas gerais (sempre calculadas sobre dados filtrados)
-        stats = {
-            'total_elevadores': total_elevadores,
-            'total_predios': len(set(e.endereco_completo for e in elevators)),
-            'cidades': len(set(e.cidade for e in elevators)),
-            'regioes': len(set(e.regiao for e in elevators)),
-            'em_atividade': elevadores_ativos,
-            'elevadores_suspensos': elevadores_suspensos,
-            'elevadores_parados': elevadores_parados
-        }
-        
-        print(f"Stats calculados: Total={total_elevadores}, Ativos={elevadores_ativos}, Suspensos={elevadores_suspensos}, Parados={elevadores_parados}")
-        
-        return stats
