@@ -426,6 +426,9 @@ class DataProcessor:
                     stats['por_regiao'][elevator.regiao] += elevator.n_elevador_parado
                     stats['por_marca'][elevator.marca_licitacao] += elevator.n_elevador_parado
                     stats['por_status']['Parados'] += elevator.n_elevador_parado
+
+                    # Suspensos
+                    stats['por_status']['Suspensos'] += elevator.n_elevador_parado
                     
                     if elevator.n_elevador_parado > 0:
                         stats['elevadores_parados'].append({

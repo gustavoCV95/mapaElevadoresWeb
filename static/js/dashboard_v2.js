@@ -44,7 +44,7 @@ function adicionarMarcadores(geojsonData) {
     // if (!geojsonData || !geojsonData.features) return;
     
     console.log(`Adicionando ${geojsonData.features.length} marcadores...`);
-
+ 
 
     geojsonData.features.forEach((feature, index) => {
         const props = feature.properties;

@@ -3,6 +3,67 @@
 {% block title %}KPIs de Manutenção - Sistema de Elevadores TJ/MG{% endblock %}
 
 {% block extra_head %}
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
+
+    <style>
+        body { background-color: #f8f9fa; }
+        .navbar-brand { font-weight: bold; }
+        .version-badge { 
+            background: linear-gradient(45deg, #28a745, #20c997); 
+            color: white; 
+            padding: 4px 8px; 
+            border-radius: 12px; 
+            font-size: 12px; 
+            margin-left: 10px;
+        }
+        .card { 
+            border: none; 
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); 
+            margin-bottom: 1rem; 
+        }
+        .card-header { 
+            background-color: #fff; 
+            border-bottom: 1px solid #dee2e6; 
+            font-weight: 600; 
+        }
+        .stats-card { transition: transform 0.2s; }
+        .stats-card:hover { transform: translateY(-2px); }
+        .map-container { 
+            height: 500px; 
+            border-radius: 0.375rem; 
+            overflow: hidden; 
+        }
+        .filter-section { 
+            max-height: 300px; 
+            overflow-y: auto; 
+        }
+        .comparison-banner {
+            background: linear-gradient(135deg, #17a2b8, #138496);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        /* NOVO: Estilos para estatí­sticas detalhadas */
+        .stats-list {
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 14px;
+        }
+        .stats-list > div {
+            padding: 2px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .stats-list > div:last-child {
+            border-bottom: none;
+        }
+        #stats-detalhadas .card-body {
+            transition: all 0.3s ease;
+        }
+    </style>
+
+
 <!-- Chart.js -->
 {# CORRIGIDO: URLs atualizadas para Chart.js v3.x e seus adaptadores #}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
