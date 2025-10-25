@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard v2.0 - Sistema de Elevadores{% endblock %}
+{% block title %}Dashboard v2.0 - Sistema de Elevadores TJ/MG{% endblock %}
 
 {% block extra_head %}
 
@@ -46,7 +46,7 @@
             border-radius: 10px;
             margin-bottom: 20px;
         }
-        /* NOVO: Estilos para estatÃ­sticas detalhadas */
+        /* NOVO: Estilos para estatí­sticas detalhadas */
         .stats-list {
             max-height: 200px;
             overflow-y: auto;
@@ -360,6 +360,42 @@
                         </div>
                         {% endif %}
 
+                        <!-- NOVO: Filtros por Marca -->
+                        {% if marcas_unicas %}
+                        <div class="mb-3">
+                            <h6><i class="fas fa-tag"></i> Marca</h6>
+                            <div class="filter-section">
+                                {% for marca in marcas_unicas %}
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" 
+                                           id="check-marca-{{ loop.index }}" value="{{ marca }}">
+                                    <label class="form-check-label" for="check-marca-{{ loop.index }}">
+                                        {{ marca }}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- NOVO: Filtros por Empresa -->
+                        {% if empresas_unicas %}
+                        <div class="mb-3">
+                            <h6><i class="fas fa-industry"></i> Empresa</h6>
+                            <div class="filter-section">
+                                {% for empresa in empresas_unicas %}
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" 
+                                           id="check-empresa-{{ loop.index }}" value="{{ empresa }}">
+                                    <label class="form-check-label" for="check-empresa-{{ loop.index }}">
+                                        {{ empresa }}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
                         <!-- Filtros por Situação -->
                         <div class="mb-3">
                             <h6><i class="fas fa-traffic-light"></i> Situação</h6>
@@ -395,7 +431,6 @@
 
 
 {% block extra_scripts %}
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script>
     // Dados iniciais do GeoJSON passados do backend via Jinja2

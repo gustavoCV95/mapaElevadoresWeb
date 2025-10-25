@@ -41,7 +41,7 @@ def create_app():
     
     print(f"DEBUG mode: {app.config.get('DEBUG', False)}")
     
-    print("Inicializando extensÃµes...")
+    print("Inicializando extensões...")
     init_extensions(app)
     
     print("Registrando blueprints...")

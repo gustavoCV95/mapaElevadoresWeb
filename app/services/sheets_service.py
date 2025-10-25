@@ -1,5 +1,5 @@
 # app/services/sheets_service.py
-from sheets_api import SheetsAPI
+from app.models.sheets_api import SheetsAPI
 
 class SheetsService:
     """Serviço para interação com Google Sheets usando a API existente"""

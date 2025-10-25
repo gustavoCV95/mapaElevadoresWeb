@@ -118,9 +118,12 @@ function aplicarFiltros() {
     
     const tipos = obterSelecionados('tipo');
     const regioes = obterSelecionados('regiao');
+    const marcas = obterSelecionados('marca')
+    const empresas = obterSelecionados('empresa')
     const situacoes = obterSelecionados('situacao');
+
     
-    console.log('Filtros selecionados:', {tipos, regioes, situacoes});
+    console.log('Filtros selecionados:', {tipos, regioes, marcas, empresas, situacoes});
     
     // Mostra loading
     mostrarLoading(true);
@@ -128,6 +131,8 @@ function aplicarFiltros() {
     const params = new URLSearchParams();
     tipos.forEach(tipo => params.append('tipo', tipo));
     regioes.forEach(regiao => params.append('regiao', regiao));
+    marcas.forEach(marca => params.append('marca', marca));
+    empresas.forEach(empresa => params.append('empresa', empresa));
     situacoes.forEach(situacao => params.append('situacao', situacao));
     
     // NOVO: Chama API que retorna dados filtrados
@@ -173,7 +178,7 @@ function ajustarZoomParaDados(geojsonData) {
     mapaLeaflet.fitBounds(group.getBounds(), {padding: [20, 20]});
 }
 
-// âœ… NOVO: Mostra/esconde loading
+// NOVO: Mostra/esconde loading
 function mostrarLoading(mostrar) {
     const btn = document.querySelector('button[onclick="aplicarFiltros()"]');
     if (btn) {

@@ -34,7 +34,7 @@
                     <i class="fas fa-sync-alt"></i> Atualizar
                 </button>
                 
-                <!-- InformaçÃµes do usuário logado -->
+                <!-- Informações do usuário logado -->
                 {% if usuario_logado %}
                 <div class="nav-item dropdown ms-3">
                     <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
@@ -100,7 +100,7 @@
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     
-    <!-- ðŸ†• JAVASCRIPT GLOBAL PARA FUNÃ‡ÃƒO ATUALIZAR -->
+    <!-- JAVASCRIPT GLOBAL PARA FUNÃÇÃO ATUALIZAR -->
     <script>
     function atualizarDados() {
         const btn = event.target;
@@ -108,12 +108,12 @@
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Atualizando...';
         btn.disabled = true;
         
-        // Verifica se estamos na pÃ¡gina de KPIs
+        // Verifica se estamos na página de KPIs
         const isKPIsPage = window.location.pathname === '/kpis';
         const endpoint = isKPIsPage ? '/atualizar-kpis' : '/atualizar';
         const tipoAtualizacao = isKPIsPage ? 'KPIs' : 'Dados';
         
-        console.log(`ðŸ”„ Atualizando ${tipoAtualizacao} via ${endpoint}`);
+        console.log(`Atualizando ${tipoAtualizacao} via ${endpoint}`);
         
         fetch(endpoint)
             .then(response => response.json())
@@ -126,7 +126,7 @@
                 }
             })
             .catch(error => {
-                console.error('âŒ Erro na requisição:', error);
+                console.error('Erro na requisição:', error);
                 alert(`Erro na requisição de ${tipoAtualizacao}. Verifique a conexão.`);
             })
             .finally(() => {

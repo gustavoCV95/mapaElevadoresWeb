@@ -14,7 +14,7 @@
     
     <style>
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #d1f2eb;
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -32,7 +32,7 @@
         }
         
         .login-header {
-            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            background: linear-gradient(135deg, #28a745 0%, #166028 100%);
             color: white;
             padding: 2rem;
             text-align: center;
@@ -56,23 +56,25 @@
         }
         
         .form-control:focus {
-            border-color: #007bff;
-            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+            border-color: #aee6d8;
+            box-shadow: 0 0 0 0.2rem rgba(32, 201, 151, 0.15);
         }
         
         .btn-login {
-            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            background: rgba(25, 135, 84, 1);
             border: none;
             border-radius: 10px;
             padding: 12px;
             font-weight: 600;
             transition: all 0.3s ease;
             width: 100%;
+            color: white;
         }
         
         .btn-login:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 123, 255, 0.4);
+            box-shadow: 0 5px 15px rgba(25, 135, 84, 1);
+            color: white;
         }
         
         .input-group-text {
@@ -119,7 +121,7 @@
             <p class="mb-0">Sistema de Elevadores</p>
         </div>
         
-        <!-- Corpo do formulÃ¡rio -->
+        <!-- Corpo do formulário -->
         <div class="login-body">
             <!-- Mensagens Flash -->
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -134,11 +136,11 @@
                 {% endif %}
             {% endwith %}
             
-            <!-- FormulÃ¡rio de Login -->
+            <!-- Formulário de Login -->
             <form method="POST" id="loginForm">
                 <div class="mb-3">
                     <label for="usuario" class="form-label">
-                        <i class="fas fa-user"></i> UsuÃ¡rio
+                        <i class="fas fa-user"></i> Usuário
                     </label>
                     <div class="input-group">
                         <span class="input-group-text">
@@ -148,7 +150,7 @@
                                class="form-control" 
                                id="usuario" 
                                name="usuario" 
-                               placeholder="Digite seu usuÃ¡rio"
+                               placeholder="Digite seu usuário"
                                required
                                autocomplete="username">
                     </div>
@@ -178,7 +180,7 @@
                     </div>
                 </div>
                 
-                <button type="submit" class="btn btn-primary btn-login" id="btnLogin">
+                <button type="submit" class="btn btn-login" id="btnLogin">
                     <span class="normal-text">
                         <i class="fas fa-sign-in-alt"></i> Entrar
                     </span>
@@ -189,7 +191,7 @@
             </form>
         </div>
         
-        <!-- RodapÃ© -->
+        <!-- Rodapé -->
         <div class="footer-info">
             <small>
                 <i class="fas fa-shield-alt"></i>
@@ -229,12 +231,12 @@
             loadingText.style.display = 'inline';
         });
         
-        // Foco automÃ¡tico no campo usuÃ¡rio
+        // Foco automático no campo usuário
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('usuario').focus();
         });
         
-        // Enter para submeter o formulÃ¡rio
+        // Enter para submeter o formulário
         document.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 document.getElementById('loginForm').submit();

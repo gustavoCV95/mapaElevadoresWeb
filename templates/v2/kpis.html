@@ -14,7 +14,7 @@
     // Configura locale global para Chart.js date-fns adapter
     Chart.defaults.plugins.tooltip.usePointStyle = true; // Estilo de tooltip mais moderno
     Chart.defaults.font.family = "'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif";
-    Chart.defaults.color = '#333'; // Cor padrão do texto nos grÃ¡ficos
+    Chart.defaults.color = '#333'; // Cor padrão do texto nos gráficos
 </script>
 {% endblock %}
 
@@ -46,7 +46,7 @@
                         <button class="btn btn-secondary btn-sm me-2" onclick="limparFiltrosKPIs()">
                             <i class="fas fa-eraser"></i> Limpar
                         </button>
-                        <button class="btn btn-info btn-sm" onclick="atualizarDados()"> {# Esta função chamarÃ¡ o /v2/kpis/atualizar-kpis #}
+                        <button class="btn btn-info btn-sm" onclick="atualizarDados()"> {# Esta função chamará o /v2/kpis/atualizar-kpis #}
                             <i class="fas fa-sync-alt"></i> Atualizar
                         </button>
                     </div>
@@ -283,28 +283,30 @@
         </div>
     </div>
 {% endif %}
+{% endblock %}
 
-<script>
-// Dados para JavaScript, injetados via Jinja2
-const dadosKPIsOriginais = {{ metricas|tojson|safe }};
-const categoriasUnicas = {{ categorias_unicas|tojson|safe }};
-const edificiosUnicos = {{ edificios_unicos|tojson|safe }};
-const equipamentosUnicos = {{ equipamentos_unicos|tojson|safe }}; // NOVO
+{% block extra_scripts %}
+    <script>
+    // Dados para JavaScript, injetados via Jinja2
+    const dadosKPIsOriginais = {{ metricas|tojson|safe }};
+    const categoriasUnicas = {{ categorias_unicas|tojson|safe }};
+    const edificiosUnicos = {{ edificios_unicos|tojson|safe }};
+    const equipamentosUnicos = {{ equipamentos_unicos|tojson|safe }}; // NOVO
 
-// Variáveis globais que serão acessadas pelo kpis_script.js
-let dadosKPIsFiltrados = dadosKPIsOriginais;
-let graficos = {};
-let filtrosAtivos = {};
+    // Variáveis globais que serão acessadas pelo kpis_script.js
+    let dadosKPIsFiltrados = dadosKPIsOriginais;
+    let graficos = {};
+    let filtrosAtivos = {};
 
 
-console.log('Dados de KPIs recebidos:', dadosKPIsOriginais);
-console.log('Categorias Únicas:', categoriasUnicas);
-console.log('Edifícios Únicos:', edificiosUnicos);
-console.log('Equipamentos Únicos:', equipamentosUnicos); // NOVO
+    console.log('Dados de KPIs recebidos:', dadosKPIsOriginais);
+    console.log('Categorias Únicas:', categoriasUnicas);
+    console.log('Edifícios Únicos:', edificiosUnicos);
+    console.log('Equipamentos Únicos:', equipamentosUnicos); // NOVO
 
-</script>
+    </script>
 
-<!-- Script customizado para os KPIs -->
-<script src="{{ url_for('static', filename='js/kpis_v2.js') }}"></script>
+    <!-- Script customizado para os KPIs -->
+    <script src="{{ url_for('static', filename='js/kpis_v2.js') }}"></script>
 
 {% endblock %}

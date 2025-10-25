@@ -6,18 +6,18 @@ from werkzeug.security import generate_password_hash
 class BaseConfig:
     """Configurações base compartilhadas entre ambientes"""
     
-    # ConfiguraÃ§Ãµes Flask
+    # Configurações Flask
     SECRET_KEY = os.environ.get('FLASK_SECRET_KEY')
     PERMANENT_SESSION_LIFETIME = timedelta(hours=1)
     
-    # URLs das planilhas - USANDO VARIÃVEIS DE AMBIENTE
+    # URLs das planilhas - USANDO VARIÁVEIS DE AMBIENTE
     PLANILHA_URL = os.environ.get('PLANILHA_URL')
     PLANILHA_KPIS_URL = os.environ.get('PLANILHA_KPIS_URL')
     
     # Cache
     CACHE_TIMEOUT = int(os.environ.get('CACHE_TIMEOUT', '300'))  # 5 minutos
     
-    # SeguranÃ§a
+    # Segurança
     MAX_TENTATIVAS_LOGIN = int(os.environ.get('MAX_TENTATIVAS_LOGIN', '5'))
     BLOQUEIO_TEMPO = int(os.environ.get('BLOQUEIO_TEMPO', '900'))  # 15 minutos
     

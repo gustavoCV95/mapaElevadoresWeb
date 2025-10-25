@@ -69,8 +69,8 @@ def index():
         elevators, processed_data = obter_dados_cached()
         
         data_processor = DataProcessor()
-        stats = data_processor.calculate_stats(elevators)
-        stats_detalhadas = data_processor.calcular_estatisticas_detalhadas(elevators)
+        stats = data_processor.calculate_stats(elevators, [])
+        stats_detalhadas = data_processor.calcular_estatisticas_detalhadas(elevators, [])
         
         print(f"Dashboard carregado: {len(elevators)} elevadores, {stats['total_predios']} prédios")
         
@@ -107,7 +107,7 @@ def api_dados_elevadores_filtrados():
     empresas = request.args.getlist('empresa')
     situacoes = request.args.getlist('situacao')
     
-    print(f"API Filtros: tipos={tipos}, regioes={regioes}, situacoes={situacoes}")
+    print(f"API Filtros: tipos={tipos}, regioes={regioes}, marcas={marcas},empresas={empresas}, situacoes={situacoes}")
     
     data_processor = DataProcessor()
     elevators_filtered, situacoes_aplicadas = data_processor.apply_filters(
@@ -120,9 +120,9 @@ def api_dados_elevadores_filtrados():
     )
     
     stats = data_processor.calculate_stats(elevators_filtered, situacoes_aplicadas)
-    stats_detalhadas = data_processor.calcular_estatisticas_detalhadas(elevators_filtered)
+    stats_detalhadas = data_processor.calcular_estatisticas_detalhadas(elevators_filtered, situacoes_aplicadas)
     
-    geojson_filtrado = data_processor.criar_geojson_manual(elevators_filtered, situacoes)
+    geojson_filtrado = data_processor.criar_geojson_manual(elevators_filtered, situacoes_aplicadas)
     
     elapsed_time = time.time() - start_time
     print(f"Filtros aplicados em {elapsed_time:.2f}s: {len(elevators_filtered)} elevadores")
@@ -155,7 +155,7 @@ def api_dados_elevadores():
     
     data_processor = DataProcessor()
     stats = data_processor.calculate_stats(elevators, [])
-    stats_detalhadas = data_processor.calcular_estatisticas_detalhadas(elevators)
+    stats_detalhadas = data_processor.calcular_estatisticas_detalhadas(elevators, [])
     
     elapsed_time = time.time() - start_time
     print(f"Todos os dados carregados em {elapsed_time:.2f}s: {len(elevators)} elevadores")
