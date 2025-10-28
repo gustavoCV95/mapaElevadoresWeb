@@ -4,11 +4,14 @@ Processador de dados refatorado com models
 """
 import pandas as pd
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Tuple
-from app.utils.helpers import safe_int, safe_str, safe_float, validate_coordinates
+from typing import List, Dict, Any, Tuple, Optional
+from app.utils.helpers import safe_int, safe_str, safe_float, validate_coordinates 
 from app.models.elevator import Elevator
+from app.models.building import Building
 from app.models.kpi import KPI
 import pytz
+from collections import defaultdict
+import numpy as np
 
 class DataProcessor:
     def __init__(self, data=None):
@@ -16,110 +19,330 @@ class DataProcessor:
         self.raw_data = data
         self.processed_data = None
 
-    def process_elevators_data(self, data: pd.DataFrame) -> Dict[str, Any]:
+
+    def process_all_elevators_and_buildings_data(self, df_detalhado: pd.DataFrame, df_info_elevadores: pd.DataFrame) -> Dict[str, Any]:
         """
-        Processa dados de elevadores para o mapa
-        MANTÉM COMPATIBILIDADE com código atual
+        Processa dados de prédios e elevadores, correlaciona-os e cria objetos Building e Elevator.
+        Gera GeoJSON agrupado por localização.
         """
-        elevators = []
-        registros_processados = []
-        
-        print(f"Processando {len(data)} registros para o mapa...")
-        
-        for idx, row in data.iterrows():
+
+        with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
+            arq.write(f"DEBUG: DataProcessor - Início do processamento. df_detalhado: {len(df_detalhado)} linhas, df_info_elevadores: {len(df_info_elevadores)} linhas.")
+            arq.write('\n')
+
+        # --- PONTO DE INSPEÇÃO 0: Verificar 'montacarga' no df_info_elevadores original ---
+        print("\nDEBUG: Verificando tipo 'montacarga' no df_info_elevadores original:")
+        # Converter a coluna 'tipo' para string antes de usar .lower() e .contains() para evitar erros com tipos não string ou NaN.
+        df_montacarga_raw = df_info_elevadores[df_info_elevadores['tipo'].astype(str).str.lower().str.contains('montacarga', na=False)]
+        print(f"DEBUG: Encontrados {len(df_montacarga_raw)} registros com 'montacarga' (case-insensitive) no df_info_elevadores raw.")
+        with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
+            arq.write(f"DEBUG: Encontrados {len(df_montacarga_raw)} registros com 'montacarga' (case-insensitive) no df_info_elevadores raw.")
+        if not df_montacarga_raw.empty:
+            print("\nDEBUG: Verificando tipo 'montacarga' no df_info_elevadores original:\nDEBUG: Detalhes dos primeiros 5 elevadores 'montacarga' no df_info_elevadores raw (ID, tipo, lat, lon):")
+            # Adicione 'id' e 'id_predio' aqui para depuração também
+            print(df_montacarga_raw[['id', 'id_predio', 'tipo', 'latitude', 'longitude']].head().to_string())
+        else:
+            with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
+                arq.write("DEBUG: Nenhum elevador do tipo 'montacarga' encontrado no df_info_elevadores raw.")
+
+        if df_detalhado.empty or df_info_elevadores.empty:
+            print("❌ Um dos DataFrames de prédios ou elevadores está vazio. Não é possível processar.")
+            return self._empty_processed_result()
+
+        # --- 1. Criar objetos Building a partir de df_detalhado ---
+        buildings: List[Building] = []
+        # Garante que o ID do prédio é int ou None
+        # df_detalhado['id'] = df_detalhado['id'].apply(safe_int) # Melhor usar apply para converter a coluna inteira
+        # Remover linhas onde o id é None antes de processar os prédios
+        df_detalhado_cleaned = df_detalhado.dropna(subset=['id']).copy()
+        df_detalhado_cleaned['id'] = df_detalhado_cleaned['id'].astype(int) 
+        df_detalhado_unique = df_detalhado_cleaned.drop_duplicates(subset=['id']).copy()
+
+        print("\nProcessando 'Detalhado' para criar objetos Building...")
+        for idx, row in df_detalhado_unique.iterrows():
             try:
-                # Valida coordenadas
-                lat_str = safe_str(row.get('latitude', '')).strip()
-                lon_str = safe_str(row.get('longitude', '')).strip()
-                
-                if not lat_str or not lon_str or lat_str == 'nan' or lon_str == 'nan':
+                building_id = safe_int(row.get('id'))
+                if building_id is None: # Pular prédios sem ID válido
+                    print(f"Prédio sem ID válido na linha {idx}. Pulando.")
                     continue
-                
-                is_valid, lat, lon = validate_coordinates(lat_str, lon_str)
-                if not is_valid:
-                    continue
-                
-                # Cria modelo Elevator
-                elevator_data = {
+
+                building_data = {
+                    'id': building_id, # Já é Optional
                     'cidade': safe_str(row.get('cidade')),
                     'unidade': safe_str(row.get('unidade')),
                     'endereco': safe_str(row.get('endereco')),
                     'endereco_completo': safe_str(row.get('enderecoCompleto')),
-                    'tipo': safe_str(row.get('tipo')),
-                    'quantidade': safe_int(row.get('quantidade')),
-                    'marca': safe_str(row.get('marca')),
-                    'marca_licitacao': safe_str(row.get('marcaLicitacao', row.get('marca', ''))),
-                    'paradas': safe_int(row.get('paradas')),
                     'regiao': safe_str(row.get('regiao')),
-                    'status': safe_str(row.get('status')),
-                    'empresa': safe_str(row.get('empresa', 'N/A')),
-                    'latitude': lat,
-                    'longitude': lon,
-                    'n_elevador_parado': safe_int(row.get('NElevadorParado', 0)),
+                }
+                buildings.append(Building.from_dict(building_data))
+            except Exception as e:
+                print(f"Erro ao criar modelo Building para registro {idx} (ID: {row.get('id')}): {e}")
+                continue
+        print(f"{len(buildings)} objetos Building criados.")
+
+        # --- 2. Criar objetos Elevator a partir de df_info_elevadores e linkar com Building ---
+        elevators: List[Elevator] = []
+        building_map: Dict[Optional[int], Building] = {b.id: b for b in buildings if b.id is not None} # Mapear prédios por ID para acesso rápido
+
+        # Garante que IDs são int ou None para o merge
+        # df_info_elevadores['id'] = df_info_elevadores['id'].apply(safe_int)
+        # df_info_elevadores['id_predio'] = df_info_elevadores['id_predio'].apply(safe_int)
+        df_info_elevadores_cleaned = df_info_elevadores.dropna(subset=['id', 'id_predio']).copy() # Remover elevadores sem ID ou ID_predio
+        df_info_elevadores_cleaned['id'] = df_info_elevadores_cleaned['id'].astype(int) 
+        df_info_elevadores_cleaned['id_predio'] = df_info_elevadores_cleaned['id_predio'].astype(int) 
+
+
+        print("\nProcessando 'info_elevadores' para criar objetos Elevator e correlacionar com Building...")
+        for idx, row in df_info_elevadores_cleaned.iterrows():
+            try:
+                elevator_id = safe_int(row.get('id'))
+                building_id = safe_int(row.get('id_predio'))
+
+                if elevator_id is None:
+                    print(f"Elevador sem ID válido na linha {idx}. Pulando.")
+                    continue
+                if building_id is None or building_id not in building_map:
+                    print(f"Prédio com ID {building_id} não encontrado para elevador {elevator_id}. Pulando elevador.")
+                    continue
+                
+                elevator_data = {
+                    'id': elevator_id,
+                    'id_predio': building_id,
+                    'descricao': safe_str(row.get('descricao', f"Elevador {elevator_id}")),
+                    'tipo': safe_str(row.get('tipo')),
+                    'marca': safe_str(row.get('marca')),
+                    'paradas': safe_int(row.get('paradas')), # Andares atendidos
+                    'marca_licitacao': safe_str(row.get('marcaLicitacao')),
+                    'status': safe_str(row.get('status', 'Em atividade')),
+                    'latitude': safe_float(row.get('latitude')), # NOVO: direto do df_info_elevadores
+                    'longitude': safe_float(row.get('longitude')), # NOVO: direto do df_info_elevadores
+                    'empresa': safe_str(row.get('empresa')), # 'empresa' da info_elevadores
+                    'capacidade_kg': safe_int(row.get('Capacidade (Kg)')),
+                    'v_m_min': safe_int(row.get('V (m/min)')),
+                    'no_break_resgate_automatico': safe_str(row.get('No-break / Resgate Automático')),
+                    'periodicidade_manutencao_preventiva': safe_str(row.get('Periodicidade Manutenção Preventiva')),
+                    'contrato': safe_str(row.get('Contrato')),
                     'data_de_parada': safe_str(row.get('DataDeParada')),
-                    'previsao_de_retorno': safe_str(row.get('PrevisaoDeRetorno'))
+                    'previsao_de_retorno': safe_str(row.get('PrevisaoDeRetorno')),
                 }
                 
-                elevator = Elevator(**elevator_data)
-                elevators.append(elevator)
+                elevator = Elevator.from_dict(elevator_data)
                 
-                # MANTÉM COMPATIBILIDADE: converte de volta para dict
-                registro_processado = elevator.to_dict()
-                registros_processados.append(registro_processado)
+                # Injetar informações do Building no Elevator
+                building_obj = building_map[building_id]
+                elevator.cidade = building_obj.cidade
+                elevator.unidade = building_obj.unidade
+                elevator.endereco = building_obj.endereco
+                elevator.endereco_completo = building_obj.endereco_completo
+                elevator.regiao = building_obj.regiao
+                elevator.building = building_obj # Referência ao objeto Building
+
+                elevators.append(elevator)
+                building_obj.elevators.append(elevator) # Adicionar elevador à lista do prédio
                 
             except Exception as e:
-                print(f"Erro ao processar registro {idx}: {e}")
+                print(f"Erro ao criar modelo Elevator para registro {idx} (ID: {row.get('id')}): {e}")
                 continue
+        print(f"{len(elevators)} objetos Elevator individuais criados e correlacionados.")
+
+        # --- 3. Calcular propriedades agregadas para Building ---
+        print("\nCalculando propriedades agregadas para Buildings...")
+        for building in buildings:
+            building.total_elevadores = len(building.elevators)
+            building.elevadores_parados = sum(1 for e in building.elevators if e.is_parado)
+            building.elevadores_suspensos = sum(1 for e in building.elevators if e.is_suspenso)
+            building.elevadores_ativos = building.total_elevadores - building.elevadores_parados - building.elevadores_suspensos
         
-        print(f"{len(elevators)} elevators processados")
+        # --- 4. Preparar saída para o dashboard (GeoJSON AGRUPADO) ---
+        geojson_data = self._create_grouped_geojson(elevators)
+        with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
+            arq.write(f"\nDEBUG: GeoJSON criado. {len(geojson_data['features'])} features (grupos de elevadores) geradas.")
         
-        if elevators:
-            # Cria GeoJSON usando os models
-            features = [elevator.to_geojson_feature() for elevator in elevators]
-            geojson_data = {
-                "type": "FeatureCollection",
-                "features": features
-            }
-            
-            # Extrai listas Únicas
-            tipos_unicos = sorted(list(set([e.tipo for e in elevators])))
-            regioes_unicas = sorted(list(set([e.regiao for e in elevators])))
-            marcas_unicas = sorted(list(set([e.marca_licitacao for e in elevators])))
-            empresas_unicas = sorted(list(set([e.empresa for e in elevators if e.empresa != 'N/A'])))
-            predios_unicos = sorted(list(set([e.endereco_completo for e in elevators])))
-            
-            return {
-                'geojson_data': geojson_data,
-                'registros_processados': registros_processados,  # COMPATIBILIDADE
-                'elevators': elevators,  # NOVO: lista de models
-                'tipos_unicos': tipos_unicos,
-                'regioes_unicas': regioes_unicas,
-                'marcas_unicas': marcas_unicas,
-                'empresas_unicas': empresas_unicas,
-                'predios_unicos': predios_unicos
-            }
-        
+        montacarga_features_geojson = [
+        f for f in geojson_data['features'] 
+        if any('montacarga' in elev_detail['tipo'].lower() for elev_detail in f['properties']['elevadores_no_grupo'])
+        ]
+        with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
+            arq.write(f"DEBUG: Encontradas {len(montacarga_features_geojson)} features GeoJSON contendo elevadores 'montacarga'.")
+        if not montacarga_features_geojson:
+            with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
+                arq.write("DEBUG: Nenhuma feature GeoJSON no mapa contém elevadores 'montacarga'. Isso pode ser devido a coordenadas inválidas/ausentes para esses elevadores, ou eles foram descartados antes do GeoJSON.")
+ 
+ 
+        # Listas únicas para filtros da UI (baseados em elevadores)
+        tipos_unicos = sorted(list(set([e.tipo for e in elevators])))
+        with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
+            arq.write(f"\nDEBUG: Tipos únicos gerados para filtros: {tipos_unicos}")
+        if 'montacarga' not in [t.lower() for t in tipos_unicos]:
+            with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
+                arq.write("DEBUG: 'montacarga' (case-insensitive) NÃO está na lista de tipos únicos. Verifique a grafia no raw data, ou se todos os 'montacarga' foram descartados antes desta etapa.")
+        regioes_unicas = sorted(list(set([e.regiao for e in elevators])))
+        marcas_unicas = sorted(list(set([e.marca_licitacao for e in elevators])))
+        empresas_unicas = sorted(list(set([e.empresa for e in elevators if e.empresa])))
+
+        buildings_for_form = [b.to_dict() for b in buildings] # Chama o to_dict() atualizado do Building
+
+        return {
+            'geojson_data': geojson_data,
+            'elevators': elevators, # Lista de modelos Elevator individuais
+            'buildings': buildings, # Lista de modelos Building
+            'tipos_unicos': tipos_unicos,
+            'regioes_unicas': regioes_unicas,
+            'marcas_unicas': marcas_unicas,
+            'empresas_unicas': empresas_unicas,
+            'buildings_for_form': buildings_for_form,
+            'df_info_elevadores_current': df_info_elevadores # O DataFrame original da aba 'info_elevadores' (para salvar)
+        }
+
+    def _empty_processed_result(self) -> Dict[str, Any]:
+        """Helper para retornar um dicionário de resultado vazio."""
         return {
             'geojson_data': {"type": "FeatureCollection", "features": []},
-            'registros_processados': [],
             'elevators': [],
+            'buildings': [],
             'tipos_unicos': [],
             'regioes_unicas': [],
             'marcas_unicas': [],
             'empresas_unicas': [],
-            'predios_unicos': []
+            'buildings_for_form': [],
+            'df_info_elevadores_current': pd.DataFrame()
         }
 
+
+    # NOVO: Método para criar GeoJSON agrupado por localização
+    def _create_grouped_geojson(self, elevators: List[Elevator]) -> Dict[str, Any]:
+        with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
+            arq.write(f"DEBUG: _create_grouped_geojson - Processando {len(elevators)} elevadores para agrupamento.")
+        grouped_elevators = defaultdict(list)
+        elevators_skipped_no_coords_for_geojson = 0
+        montacarga_skipped_geojson = 0 # Contador específico para montacarga
+        for elev in elevators:
+            # Garante que latitude e longitude não são None ou np.nan antes de usar como chave
+            if elev.latitude is not None and not np.isnan(elev.latitude) and \
+               elev.longitude is not None and not np.isnan(elev.longitude):
+                key = (elev.latitude, elev.longitude)
+                grouped_elevators[key].append(elev)
+            else:
+                if elev.tipo and 'montacarga' in elev.tipo.lower():
+                    with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
+                        arq.write(f"DEBUG: Elevador 'montacarga' ID {elev.id} pulado no GeoJSON por coordenadas inválidas/ausentes: Lat='{elev.latitude}', Lon='{elev.longitude}'.")
+                    montacarga_skipped_geojson += 1
+                else:
+                    with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
+                        arq.write(f"DEBUG: Elevador ID {elev.id} ('{elev.tipo}') pulado no GeoJSON por coordenadas inválidas/ausentes.")
+                    elevators_skipped_no_coords_for_geojson += 1
+                with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
+                    arq.write(f"DEBUG: {len(grouped_elevators)} grupos de elevadores criados. ({elevators_skipped_no_coords_for_geojson} elevadores ignorados por falta de coordenadas para GeoJSON, dos quais {montacarga_skipped_geojson} eram 'montacarga').")  
+                print(f"Elevador ID {elev.id} sem coordenadas válidas. Pulando no agrupamento GeoJSON.")
+
+
+        features = []
+        for (lat, lon), group in grouped_elevators.items():
+            total_elevadores_grupo = len(group)
+            
+            status_prioritario = 'Em atividade'
+            cor_marcador_grupo = '#28a745' # Verde
+            
+            if any(e.is_parado for e in group):
+                status_prioritario = 'Parado'
+                cor_marcador_grupo = '#dc3545' # Vermelho
+            elif any(e.is_suspenso for e in group):
+                status_prioritario = 'Suspenso'
+                cor_marcador_grupo = '#ffc107' # Amarelo
+            
+            tamanho_marcador_grupo = 4
+            if total_elevadores_grupo >= 5:
+                tamanho_marcador_grupo = 8
+            elif total_elevadores_grupo >= 3:
+                tamanho_marcador_grupo = 6
+            
+            elevadores_no_grupo_details = []
+            for e in group:
+                elevadores_no_grupo_details.append({
+                    'id': e.id,
+                    'descricao': e.descricao,
+                    'tipo': e.tipo,
+                    'marca': e.marca_licitacao,
+                    'status': e.status,
+                    'data_de_parada': e.data_de_parada,
+                    'previsao_de_retorno': e.previsao_de_retorno,
+                    'empresa': e.empresa,
+                })
+
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [lon, lat]
+                },
+                "properties": {
+                    'latitude': lat,
+                    'longitude': lon,
+                    'total_elevadores_grupo': total_elevadores_grupo,
+                    'status_grupo_prioritario': status_prioritario,
+                    'cor_marcador_grupo': cor_marcador_grupo,
+                    'tamanho_marcador_grupo': tamanho_marcador_grupo,
+                    'cidade': group[0].cidade, # Pegar cidade do primeiro elevador do grupo
+                    'unidade': group[0].unidade, # Pegar unidade do primeiro elevador do grupo
+                    'endereco': group[0].endereco,
+                    'endereco_completo': group[0].endereco_completo,
+                    'elevadores_no_grupo': elevadores_no_grupo_details 
+                }
+            })
+        
+        return {
+            "type": "FeatureCollection",
+            "features": features
+        }
+
+    # NOVO: Método para buscar elevador individual por ID único
+    def get_elevator_by_id(self, elevators: List[Elevator], id_elevador: int) -> Optional[Elevator]:
+        for e in elevators:
+            if e.id == id_elevador:
+                return e
+        return None
+
+    # NOVO: Método para buscar elevadores por localização do prédio
+    def get_elevators_by_building_location(self, elevators: List[Elevator], cidade: str, unidade: str, endereco: str) -> List[Elevator]:
+        filtered = [e for e in elevators if 
+                    e.cidade.lower() == cidade.lower() and 
+                    e.unidade.lower() == unidade.lower() and
+                    e.endereco.lower() == endereco.lower()]
+        return filtered
+
+    # NOVO: Método para preparar o DataFrame 'info_elevadores' para escrita
+    def prepare_df_info_elevadores_for_write(self, all_elevators: List[Elevator], original_df_info_elevadores: pd.DataFrame) -> pd.DataFrame:
+        if original_df_info_elevadores.empty:
+            raise ValueError("O DataFrame original de 'info_elevadores' está vazio. Não é possível atualizar.")
+
+        df_updated = original_df_info_elevadores.copy()
+        
+        for elev_obj in all_elevators:
+            # Verifica se o ID do elevador é None antes de tentar usá-lo
+            if elev_obj.id is None:
+                print(f"   ⚠️ Elevador com ID None encontrado. Não será atualizado no DataFrame.")
+                continue
+
+            idx = df_updated[df_updated['id'] == elev_obj.id].index
+            if not idx.empty:
+                df_updated.loc[idx, 'status'] = elev_obj.status
+                # Garante que None seja convertido para string vazia para a planilha
+                df_updated.loc[idx, 'DataDeParada'] = elev_obj.data_de_parada if elev_obj.data_de_parada is not None else '' 
+                df_updated.loc[idx, 'PrevisaoDeRetorno'] = elev_obj.previsao_de_retorno if elev_obj.previsao_de_retorno is not None else ''
+            else:
+                print(f"   ⚠️ Elevador com ID {elev_obj.id} não encontrado no DataFrame original para atualização.")
+        
+        return df_updated
+
+
+    # --- Métodos de Filtro (apply_filters) e Cálculo de Stats (atualizados) ---
+    # Estes métodos operam sobre a lista de objetos Elevator (individuais)
+    
     def apply_filters(self, elevators: List[Elevator], tipos=None, regioes=None, 
                     marcas=None, empresas=None, situacoes=None) -> tuple[List[Elevator], List[str]]:
-        """
-        Aplica filtros aos elevadores
-        RESPONSABILIDADE: Apenas filtrar dados, sem lógica de cálculo
-        RETORNA: (elevators_filtrados, situacoes_aplicadas)
-        """
+        """Aplica filtros à lista de elevadores individuais."""
         filtered = elevators.copy()
         
-        # Filtros básicos
         if tipos:
             filtered = [e for e in filtered if e.tipo in tipos]
         
@@ -134,37 +357,23 @@ class DataProcessor:
         
         situacoes_aplicadas = situacoes or []
         
-        # Filtros de situação
         if situacoes:
-            situacao_filtered = []
+            situacao_filtered_temp = []
             for situacao in situacoes:
                 if situacao == 'suspensos':
-                    situacao_filtered.extend([e for e in filtered if e.status == 'Suspenso'])
+                    situacao_filtered_temp.extend([e for e in filtered if e.is_suspenso])
                 elif situacao == 'parados':
-                    situacao_filtered.extend([e for e in filtered if e.tem_elevador_parado])
+                    situacao_filtered_temp.extend([e for e in filtered if e.is_parado])
                 elif situacao == 'ativos':
-                    situacao_filtered.extend([e for e in filtered if e.status == 'Em atividade'])
-            
-            def criar_id(elevator):
-                return f"{elevator.cidade}_{elevator.unidade}_{elevator.endereco}_{elevator.tipo}_{elevator.quantidade}_{elevator.paradas}_{elevator.latitude}_{elevator.longitude}"
-
-            ids_vistos = set()
-            filtered = []
-            for elevator in situacao_filtered:
-                elevator_id = criar_id(elevator)
-                if elevator_id not in ids_vistos:
-                    ids_vistos.add(elevator_id)
-                    filtered.append(elevator)
-
-        print(f"Filtros aplicados: {sum(e.quantidade for e in elevators)} -> {sum(e.quantidade for e in filtered)} elevadores")
+                    situacao_filtered_temp.extend([e for e in filtered if not e.is_parado and not e.is_suspenso])
+            filtered = situacao_filtered_temp 
+        
+        print(f"Filtros aplicados resultaram em {len(filtered)} elevadores individuais.")
         
         return filtered, situacoes_aplicadas
 
     def calculate_stats(self, elevators: List[Elevator], situacoes_filtradas: List[str] = None) -> Dict[str, Any]:
-        """
-        Calcula estatísticas dos elevadores
-        RESPONSABILIDADE: Apenas calcular, assumindo que dados já estão filtrados
-        """
+        """Calcula estatísticas agregadas (agora com base em Elevators e Buildings)."""
         if not elevators:
             return {
                 'total_elevadores': 0,
@@ -176,95 +385,20 @@ class DataProcessor:
                 'elevadores_parados': 0
             }
         
-        situacoes_filtradas = situacoes_filtradas or []
+        total_elevadores = len(elevators)
+        elevadores_suspensos = sum(1 for e in elevators if e.is_suspenso)
+        elevadores_parados = sum(1 for e in elevators if e.is_parado)
+        elevadores_ativos = total_elevadores - elevadores_suspensos - elevadores_parados
         
-        # Contadores
-        total_elevadores = 0
-        elevadores_suspensos = 0
-        elevadores_parados = 0
-        elevadores_ativos = 0
-        
-        # Lógica de cálculo baseada nos filtros aplicados
-        if situacoes_filtradas == ['parados']:
-            # FILTRO "PARADOS" ÚNICO: Conta APENAS os parados
-            for elevator in elevators:
-                elevadores_parados += elevator.n_elevador_parado
-            total_elevadores = elevadores_parados
-            
-        elif situacoes_filtradas == ['suspensos']:
-            # FILTRO "SUSPENSOS" ÚNICO: Conta APENAS os suspensos
-            for elevator in elevators:
-                elevadores_suspensos += elevator.quantidade
-            total_elevadores = elevadores_suspensos
-            
-        elif situacoes_filtradas == ['ativos']:
-            # FILTRO "ATIVOS" ÚNICO: Conta APENAS os ativos
-            for elevator in elevators:
-                ativos_neste_predio = elevator.quantidade - elevator.n_elevador_parado
-                elevadores_ativos += ativos_neste_predio
-            total_elevadores = elevadores_ativos
-        
-        elif set(situacoes_filtradas) == {'ativos', 'suspensos'}:
-            # FILTRO MISTO: "ATIVOS" + "SUSPENSOS"
-            for elevator in elevators:
-                if elevator.status == 'Suspenso':
-                    elevadores_suspensos += elevator.quantidade
-                    total_elevadores += elevator.quantidade
-                else:  # Em atividade
-                    ativos_neste_predio = elevator.quantidade - elevator.n_elevador_parado
-                    elevadores_ativos += ativos_neste_predio
-                    total_elevadores += ativos_neste_predio
-        
-        elif set(situacoes_filtradas) == {'ativos', 'parados'}:
-            # FILTRO MISTO: "ATIVOS" + "PARADOS"
-            for elevator in elevators:
-                ativos_neste_predio = elevator.quantidade - elevator.n_elevador_parado
-                elevadores_ativos += ativos_neste_predio
-                elevadores_parados += elevator.n_elevador_parado
-                total_elevadores += elevator.quantidade
-        
-        elif set(situacoes_filtradas) == {'parados', 'suspensos'}:
-            # FILTRO MISTO: "PARADOS" + "SUSPENSOS"
-            for elevator in elevators:
-                if elevator.status == 'Suspenso':
-                    elevadores_suspensos += elevator.quantidade
-                    total_elevadores += elevator.quantidade
-                else:  # Em atividade com parados
-                    elevadores_parados += elevator.n_elevador_parado
-                    total_elevadores += elevator.n_elevador_parado
-        
-        else:
-            # SEM FILTRO ou FILTRO COMPLETO: Lógica completa
-            for elevator in elevators:                
-                if elevator.status == 'Suspenso':
-                    elevadores_suspensos += elevator.quantidade
-                    total_elevadores += elevator.quantidade
-                else:
-                    elevadores_ativos += elevator.quantidade - elevator.n_elevador_parado
-                    elevadores_parados += elevator.n_elevador_parado
-                    total_elevadores += elevator.quantidade
-        
-        # Para filtros de prédios, cidades, regiões
+        unique_predios = set(e.building.id for e in elevators) 
+        unique_cidades = set(e.cidade for e in elevators)
+        unique_regioes = set(e.regiao for e in elevators)
 
-        filtered = elevators.copy()
-
-        if situacoes_filtradas:
-            situacao_filtered = []
-            for situacao in situacoes_filtradas:
-                if situacao == 'suspensos':
-                    situacao_filtered.extend([e for e in filtered if e.status == 'Suspenso'])
-                elif situacao == 'parados':
-                    situacao_filtered.extend([e for e in filtered if e.tem_elevador_parado])
-                elif situacao == 'ativos':
-                    situacao_filtered.extend([e for e in filtered if e.status == 'Em atividade' and not e.tem_elevador_parado])
-            filtered = situacao_filtered
-
-        # Estatísticas gerais (sempre calculadas sobre dados filtrados)
         stats = {
             'total_elevadores': total_elevadores,
-            'total_predios': len(set(e.endereco_completo for e in filtered)),
-            'cidades': len(set(e.cidade for e in filtered)),
-            'regioes': len(set(e.regiao for e in filtered)),
+            'total_predios': len(unique_predios),
+            'cidades': len(unique_cidades),
+            'regioes': len(unique_regioes),
             'em_atividade': elevadores_ativos,
             'elevadores_suspensos': elevadores_suspensos,
             'elevadores_parados': elevadores_parados
@@ -276,20 +410,14 @@ class DataProcessor:
 
     def calcular_estatisticas_detalhadas(self, elevators: List[Elevator], situacoes_filtradas: List[str] = None) -> Dict[str, Any]:
         """
-        Calcula estatísticas detalhadas usando a MESMA LÓGICA do calculate_stats
+        Calcula estatísticas detalhadas para elevadores individuais.
+        A lista 'elevadores_parados' agora conterá Elevator.to_dict() de elevadores individuais.
         """
-        from collections import defaultdict
-        
         if not elevators:
             return {
-                'por_tipo': {},
-                'por_regiao': {},
-                'por_marca': {},
-                'por_status': {},
-                'elevadores_parados': []
+                'por_tipo': {}, 'por_regiao': {}, 'por_marca': {}, 'por_status': {},
+                'elevadores_parados': [] 
             }
-        
-        situacoes_filtradas = situacoes_filtradas or []
         
         stats = {
             'por_tipo': defaultdict(int),
@@ -299,199 +427,36 @@ class DataProcessor:
             'elevadores_parados': []
         }
         
-        # MESMA LÓGICA DA PRIMEIRA FUNÇÃO
-        if situacoes_filtradas == ['parados']:
-            # FILTRO "PARADOS" ÚNICO: Conta APENAS os parados
-            for elevator in elevators:
-                stats['por_tipo'][elevator.tipo] += elevator.n_elevador_parado
-                stats['por_regiao'][elevator.regiao] += elevator.n_elevador_parado
-                stats['por_marca'][elevator.marca_licitacao] += elevator.n_elevador_parado
-                stats['por_status']['Parados'] += elevator.n_elevador_parado
-                
-                if elevator.n_elevador_parado > 0:
-                    stats['elevadores_parados'].append({
-                        'unidade': elevator.unidade,
-                        'cidade': elevator.cidade,
-                        'tipo': elevator.tipo,
-                        'regiao': elevator.regiao,
-                        'quantidade_parada': elevator.n_elevador_parado,
-                        'total_elevadores': elevator.quantidade,
-                        'marca': elevator.marca_licitacao
-                    })
-                
-        elif situacoes_filtradas == ['suspensos']:
-            # FILTRO "SUSPENSOS" ÚNICO: Conta APENAS os suspensos
-            for elevator in elevators:
-                stats['por_tipo'][elevator.tipo] += elevator.quantidade
-                stats['por_regiao'][elevator.regiao] += elevator.quantidade
-                stats['por_marca'][elevator.marca_licitacao] += elevator.quantidade
-                stats['por_status']['Suspensos'] += elevator.quantidade
-                
-        elif situacoes_filtradas == ['ativos']:
-            # FILTRO "ATIVOS" ÚNICO: Conta APENAS os ativos
-            for elevator in elevators:
-                ativos_neste_predio = elevator.quantidade - elevator.n_elevador_parado
-                stats['por_tipo'][elevator.tipo] += ativos_neste_predio
-                stats['por_regiao'][elevator.regiao] += ativos_neste_predio
-                stats['por_marca'][elevator.marca_licitacao] += ativos_neste_predio
-                stats['por_status']['Em atividade'] += ativos_neste_predio
+        for elevator in elevators:                
+            if elevator.is_suspenso:
+                stats['por_tipo'][elevator.tipo] += 1
+                stats['por_regiao'][elevator.regiao] += 1
+                stats['por_marca'][elevator.marca_licitacao] += 1
+                stats['por_status']['Suspensos'] += 1
+            elif elevator.is_parado:
+                stats['por_tipo'][elevator.tipo] += 1
+                stats['por_regiao'][elevator.regiao] += 1
+                stats['por_marca'][elevator.marca_licitacao] += 1
+                stats['por_status']['Parados'] += 1
+                stats['elevadores_parados'].append(elevator.to_dict())
+            else: # Em atividade
+                stats['por_tipo'][elevator.tipo] += 1
+                stats['por_regiao'][elevator.regiao] += 1
+                stats['por_marca'][elevator.marca_licitacao] += 1
+                stats['por_status']['Em atividade'] += 1
         
-        elif set(situacoes_filtradas) == {'ativos', 'suspensos'}:
-            # FILTRO MISTO: "ATIVOS" + "SUSPENSOS"
-            for elevator in elevators:
-                if elevator.status == 'Suspenso':
-                    stats['por_tipo'][elevator.tipo] += elevator.quantidade
-                    stats['por_regiao'][elevator.regiao] += elevator.quantidade
-                    stats['por_marca'][elevator.marca_licitacao] += elevator.quantidade
-                    stats['por_status']['Suspensos'] += elevator.quantidade
-                else:  # Em atividade
-                    ativos_neste_predio = elevator.quantidade - elevator.n_elevador_parado
-                    stats['por_tipo'][elevator.tipo] += ativos_neste_predio
-                    stats['por_regiao'][elevator.regiao] += ativos_neste_predio
-                    stats['por_marca'][elevator.marca_licitacao] += ativos_neste_predio
-                    stats['por_status']['Em atividade'] += ativos_neste_predio
-        
-        elif set(situacoes_filtradas) == {'ativos', 'parados'}:
-            # FILTRO MISTO: "ATIVOS" + "PARADOS"
-            for elevator in elevators:
-                ativos_neste_predio = elevator.quantidade - elevator.n_elevador_parado
-                
-                # Conta ativos
-                stats['por_tipo'][elevator.tipo] += ativos_neste_predio
-                stats['por_regiao'][elevator.regiao] += ativos_neste_predio
-                stats['por_marca'][elevator.marca_licitacao] += ativos_neste_predio
-                stats['por_status']['Em atividade'] += ativos_neste_predio
-                
-                # Conta parados
-                stats['por_tipo'][elevator.tipo] += elevator.n_elevador_parado
-                stats['por_regiao'][elevator.regiao] += elevator.n_elevador_parado
-                stats['por_marca'][elevator.marca_licitacao] += elevator.n_elevador_parado
-                stats['por_status']['Parados'] += elevator.n_elevador_parado
-                
-                if elevator.n_elevador_parado > 0:
-                    stats['elevadores_parados'].append({
-                        'unidade': elevator.unidade,
-                        'cidade': elevator.cidade,
-                        'tipo': elevator.tipo,
-                        'regiao': elevator.regiao,
-                        'quantidade_parada': elevator.n_elevador_parado,
-                        'total_elevadores': elevator.quantidade,
-                        'marca': elevator.marca_licitacao
-                    })
-        
-        elif set(situacoes_filtradas) == {'parados', 'suspensos'}:
-            # FILTRO MISTO: "PARADOS" + "SUSPENSOS"
-            for elevator in elevators:
-                if elevator.status == 'Suspenso':
-                    stats['por_tipo'][elevator.tipo] += elevator.quantidade
-                    stats['por_regiao'][elevator.regiao] += elevator.quantidade
-                    stats['por_marca'][elevator.marca_licitacao] += elevator.quantidade
-                    stats['por_status']['Suspensos'] += elevator.quantidade
-                else:  # Em atividade com parados
-                    stats['por_tipo'][elevator.tipo] += elevator.n_elevador_parado
-                    stats['por_regiao'][elevator.regiao] += elevator.n_elevador_parado
-                    stats['por_marca'][elevator.marca_licitacao] += elevator.n_elevador_parado
-                    stats['por_status']['Parados'] += elevator.n_elevador_parado
-                    
-                    if elevator.n_elevador_parado > 0:
-                        stats['elevadores_parados'].append({
-                            'unidade': elevator.unidade,
-                            'cidade': elevator.cidade,
-                            'tipo': elevator.tipo,
-                            'regiao': elevator.regiao,
-                            'quantidade_parada': elevator.n_elevador_parado,
-                            'total_elevadores': elevator.quantidade,
-                            'marca': elevator.marca_licitacao
-                        })
-        
-        else:
-            # SEM FILTRO ou FILTRO COMPLETO: Lógica completa
-            for elevator in elevators:                
-                if elevator.status == 'Suspenso':
-                    stats['por_tipo'][elevator.tipo] += elevator.quantidade
-                    stats['por_regiao'][elevator.regiao] += elevator.quantidade
-                    stats['por_marca'][elevator.marca_licitacao] += elevator.quantidade
-                    stats['por_status']['Suspensos'] += elevator.quantidade
-                else:
-                    ativos_neste_predio = elevator.quantidade - elevator.n_elevador_parado
-                    
-                    # Conta ativos
-                    stats['por_tipo'][elevator.tipo] += ativos_neste_predio
-                    stats['por_regiao'][elevator.regiao] += ativos_neste_predio
-                    stats['por_marca'][elevator.marca_licitacao] += ativos_neste_predio
-                    stats['por_status']['Em atividade'] += ativos_neste_predio
-                    
-                    # Conta parados
-                    stats['por_tipo'][elevator.tipo] += elevator.n_elevador_parado
-                    stats['por_regiao'][elevator.regiao] += elevator.n_elevador_parado
-                    stats['por_marca'][elevator.marca_licitacao] += elevator.n_elevador_parado
-                    stats['por_status']['Parados'] += elevator.n_elevador_parado
-
-                    # Suspensos
-                    stats['por_status']['Suspensos'] += elevator.n_elevador_parado
-                    
-                    if elevator.n_elevador_parado > 0:
-                        stats['elevadores_parados'].append({
-                            'unidade': elevator.unidade,
-                            'cidade': elevator.cidade,
-                            'tipo': elevator.tipo,
-                            'regiao': elevator.regiao,
-                            'quantidade_parada': elevator.n_elevador_parado,
-                            'total_elevadores': elevator.quantidade,
-                            'marca': elevator.marca_licitacao
-                        })
-        
-        # Converte para dict normal e ordena
-        for categoria in ['por_tipo', 'por_regiao', 'por_marca']:
+        for categoria in ['por_tipo', 'por_regiao', 'por_marca', 'por_status']:
             stats[categoria] = dict(sorted(stats[categoria].items(), key=lambda x: x[1], reverse=True))
         
-        # Status mantém ordem específica
-        stats['por_status'] = dict(stats['por_status'])
-        
-        print(f"Stats detalhadas: {dict(stats['por_status'])}")
+        print(f"Métricas detalhadas calculadas.")
         
         return stats
 
     def criar_geojson_manual(self, elevators: List[Elevator], situacoes_filtradas: List[str] = None):
-        """Cria GeoJSON otimizado"""
-        features = []
-        filtered = elevators.copy()
-        
-        # Filtros de situação
-        if situacoes_filtradas:
-            situacao_filtered = []
-            for situacao in situacoes_filtradas:
-                if situacao == 'suspensos':
-                    situacao_filtered.extend([e for e in filtered if e.status == 'Suspenso'])
-                elif situacao == 'parados':
-                    situacao_filtered.extend([e for e in filtered if e.tem_elevador_parado])
-                elif situacao == 'ativos':
-                    situacao_filtered.extend([e for e in filtered if e.status == 'Em atividade' and not e.tem_elevador_parado])
-            filtered = situacao_filtered
-        
-        for elevator in filtered:
-            if hasattr(elevator, 'latitude') and hasattr(elevator, 'longitude'):
-                try:
-                    lat = float(elevator.latitude)
-                    lng = float(elevator.longitude)
-                    
-                    # Pula coordenadas inválidas
-                    if lat == 0 or lng == 0:
-                        continue
-                        
-                    feature = elevator.to_geojson_feature()
-
-                    # Adicione uma validação extra caso to_geojson_feature retorne None por algum motivo
-                    if feature:
-                        features.append(feature)
-
-                except (ValueError, TypeError):
-                    continue
-        
-        return {
-            "type": "FeatureCollection",
-            "features": features
-        }
+        """Cria GeoJSON com base nos elevadores individuais filtrados (agora agrupado)."""
+        # Este método agora simplesmente chama o método interno de agrupamento
+        # Ele recebe os elevadores JÁ FILTRADOS
+        return self._create_grouped_geojson(elevators)
 
     def process_kpis_data(self, data: pd.DataFrame) -> Dict[str, Any]:
         """

@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 from flask import current_app
 import pandas as pd
+import numpy as np
 
 def format_datetime(value, format='%Y-%m-%d %H:%M:%S'):
     """Formata um objeto datetime para uma string"""
@@ -15,27 +16,30 @@ def is_valid_email(email):
     pattern = r'^[\w\.-]+@[\w\.-]+\.\w+'
     return re.match(pattern, email) is not None
 
-def safe_int(value, default=0):
-    """Converte valor para int de forma segura"""
+def safe_int(value, default=None):
     try:
-        return int(value) if pd.notna(value) else default
+        if pd.isna(value) or (isinstance(value, float) and np.isnan(value)) or str(value).strip() == '': 
+            return default
+        return int(value)
     except (ValueError, TypeError):
         return default
 
-def safe_float(value, default=0.0):
-    """Converte valor para float de forma segura"""
+def safe_float(value, default=None):
     try:
-        return float(value) if pd.notna(value) else default
+        if pd.isna(value) or (isinstance(value, float) and np.isnan(value)) or str(value).strip() == '': 
+            return default
+        return float(value)
     except (ValueError, TypeError):
         return default
 
 def safe_str(value, default=''):
-    """Converte valor para string de forma segura"""
     try:
-        return str(value) if pd.notna(value) else default
+        if pd.isna(value) or (isinstance(value, float) and np.isnan(value)): # Considera np.nan como vazio
+            return default
+        return str(value)
     except (ValueError, TypeError):
         return default
-
+    
 def validate_coordinates(lat, lon):
     """Valida se as coordenadas são válidas"""
     try:

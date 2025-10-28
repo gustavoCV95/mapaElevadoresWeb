@@ -3,6 +3,7 @@
 """
 Models da aplicação
 """
+from .building import Building
 from .elevator import Elevator
 from .kpi import KPI
 

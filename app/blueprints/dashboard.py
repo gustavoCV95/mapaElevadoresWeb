@@ -1,20 +1,25 @@
 # app/blueprints/dashboard.py
 from flask import Blueprint, render_template, jsonify, request, current_app
-from app.utils.auth_decorators import login_required_v2, api_auth_required # Importa api_auth_required
+from app.utils.auth_decorators import login_required_v2, api_auth_required
 from app.services.sheets_service import SheetsService
 from app.services.data_processor import DataProcessor
 from app.services.auth_service import AuthService
 from app.models.elevator import Elevator
+from app.models.building import Building # NOVO
 from typing import List
 import time
+import pandas as pd # Adicionado para uso com DataFrames
+from typing import Optional
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/v2')
 
 # CACHE GLOBAL PARA DADOS PROCESSADOS
 _dados_cache = {
-    'dados_raw': None,
-    'processed_data': None,
-    'elevators': None,
+    'df_detalhado': None,
+    'df_info_elevadores': None,
+    'elevators': None,  # Lista de objetos Elevator
+    'buildings': None,  # Lista de objetos Building
+    'processed_data': None, # Resultado completo do processamento do DataProcessor
     'timestamp': None
 }
 
@@ -25,39 +30,47 @@ def obter_dados_cached():
     # Verifica se cache é válido (5 minutos)
     cache_valido = (
         _dados_cache['timestamp'] and 
-        (time.time() - _dados_cache['timestamp']) < 300
+        (time.time() - _dados_cache['timestamp']) < current_app.config.get('CACHE_TIMEOUT', 300) and
+        _dados_cache['elevators'] is not None and
+        _dados_cache['buildings'] is not None
     )
     
-    if cache_valido and _dados_cache['elevators']:
-        print("Usando dados do cache")
-        return _dados_cache['elevators'], _dados_cache['processed_data']
+    if cache_valido:
+        print("Usando dados de elevadores e prédios do cache (multi-abas)")
+        return _dados_cache['elevators'], _dados_cache['buildings'], _dados_cache['processed_data']
     
     # Recarrega dados
-    print("Recarregando dados (cache expirado)")
+    print("Recarregando dados de elevadores e prédios (cache expirado ou inexistente - multi-abas)")
     planilha_url = current_app.config.get('PLANILHA_URL')
     if not planilha_url:
-        raise ValueError("URL da planilha não configurada")
+        raise ValueError("URL da planilha não configurada. Defina PLANILHA_URL nas variáveis de ambiente.")
     
     sheets_service = SheetsService()
     data_processor = DataProcessor()
     
-    dados_raw = sheets_service.obter_dados_elevadores(planilha_url)
-    if dados_raw.empty:
-        raise ValueError("Nenhum dado encontrado")
+    df_detalhado = sheets_service.obter_dados_detalhado(planilha_url)
+    df_info_elevadores = sheets_service.obter_dados_elevadores_individuais(planilha_url)
     
-    processed_data = data_processor.process_elevators_data(dados_raw)
-    elevators = [Elevator.from_dict(props) for props in processed_data['registros_processados']]
+    if df_detalhado.empty or df_info_elevadores.empty:
+        raise ValueError("Nenhum dado encontrado em uma ou ambas as abas de elevadores. Verifique a planilha e os nomes das abas.")
+
+    processed_result = data_processor.process_all_elevators_and_buildings_data(df_detalhado, df_info_elevadores)
     
-    # Atualiza cache
+    elevators = processed_result['elevators']
+    buildings = processed_result['buildings']
+    processed_data = processed_result # Contém geojson, listas únicas, df_info_elevadores_current, etc.
+    
     _dados_cache.update({
-        'dados_raw': dados_raw,
-        'processed_data': processed_data,
+        'df_detalhado': df_detalhado,
+        'df_info_elevadores': df_info_elevadores, # DataFrame RAW da info_elevadores
         'elevators': elevators,
+        'buildings': buildings,
+        'processed_data': processed_data,
         'timestamp': time.time()
     })
     
-    print(f"Cache atualizado: {len(elevators)} elevadores")
-    return elevators, processed_data
+    print(f"Cache de elevadores atualizado: {len(elevators)} elevadores individuais e {len(buildings)} prédios processados.")
+    return elevators, buildings, processed_data
 
 @dashboard_bp.route('/')
 @dashboard_bp.route('/dashboard')
@@ -66,15 +79,15 @@ def index():
     """Dashboard principal da nova arquitetura"""
     try:
         print("Carregando dashboard...")
-        elevators, processed_data = obter_dados_cached()
+        all_elevators, all_buildings, processed_data = obter_dados_cached()
         
         data_processor = DataProcessor()
-        stats = data_processor.calculate_stats(elevators, [])
-        stats_detalhadas = data_processor.calcular_estatisticas_detalhadas(elevators, [])
+        stats = data_processor.calculate_stats(all_elevators, [])
+        stats_detalhadas = data_processor.calcular_estatisticas_detalhadas(all_elevators, [])
         
-        print(f"Dashboard carregado: {len(elevators)} elevadores, {stats['total_predios']} prédios")
+        print(f"Dashboard carregado: {len(all_elevators)} elevadores, {len(all_buildings)} prédios")
         
-        return render_template('v2/dashboard.html',
+        return render_template('dashboard.html',
                              geojson_data=processed_data['geojson_data'],
                              stats=stats,
                              stats_detalhadas=stats_detalhadas,
@@ -82,24 +95,26 @@ def index():
                              regioes_unicas=processed_data['regioes_unicas'],
                              marcas_unicas=processed_data['marcas_unicas'],
                              empresas_unicas=processed_data['empresas_unicas'],
+                             buildings_for_form=[b.to_dict() for b in all_buildings], # Passa dicts de Building
+                             all_elevators_individual_json=[e.to_dict() for e in all_elevators], # Passa dicts de Elevator
                              usuario=AuthService.get_current_user(),
-                             total_elevadores=len(elevators))
+                             total_elevadores=len(all_elevators))
                              
     except Exception as e:
         print(f"Erro no dashboard: {e}")
-        import traceback
-        traceback.print_exc()
+        current_app.logger.exception(f"Erro ao carregar dashboard: {e}") # Loga a exceção completa
         
-        return render_template('v2/dashboard.html',
+        return render_template('dashboard.html',
                              erro=f"Erro interno: {str(e)}",
                              usuario=AuthService.get_current_user())
 
 @dashboard_bp.route('/api/dados-elevadores-filtrados')
+@api_auth_required
 def api_dados_elevadores_filtrados():
     """API OTIMIZADA para obter dados filtrados"""
     start_time = time.time()
     
-    elevators, processed_data = obter_dados_cached()
+    all_elevators, _, _ = obter_dados_cached()
     
     tipos = request.args.getlist('tipo')
     regioes = request.args.getlist('regiao')
@@ -111,7 +126,7 @@ def api_dados_elevadores_filtrados():
     
     data_processor = DataProcessor()
     elevators_filtered, situacoes_aplicadas = data_processor.apply_filters(
-        elevators,
+        all_elevators, 
         tipos=tipos,
         regioes=regioes,
         marcas=marcas,
@@ -151,14 +166,14 @@ def api_dados_elevadores():
     start_time = time.time()
     print("API: Carregando todos os dados (sem filtros)...")
     
-    elevators, processed_data = obter_dados_cached()
+    all_elevators, _, processed_data = obter_dados_cached()
     
     data_processor = DataProcessor()
-    stats = data_processor.calculate_stats(elevators, [])
-    stats_detalhadas = data_processor.calcular_estatisticas_detalhadas(elevators, [])
+    stats = data_processor.calculate_stats(all_elevators, [])
+    stats_detalhadas = data_processor.calcular_estatisticas_detalhadas(all_elevators, [])
     
     elapsed_time = time.time() - start_time
-    print(f"Todos os dados carregados em {elapsed_time:.2f}s: {len(elevators)} elevadores")
+    print(f"Todos os dados carregados em {elapsed_time:.2f}s: {len(all_elevators)} elevadores")
     
     # Retorna um dicionário, que api_auth_required (via json_response) irá converter para JSON e lidar com erros
     return jsonify({
@@ -167,7 +182,7 @@ def api_dados_elevadores():
             'geojson': processed_data['geojson_data'],
             'stats': stats,
             'stats_detalhadas': stats_detalhadas,
-            'total_registros': len(elevators),
+            'total_registros': len(all_elevators),
             'performance': {
                 'tempo_processamento': f"{elapsed_time:.2f}s",
                 'fonte_dados': 'cache'
@@ -205,3 +220,82 @@ def atualizar_dados():
             'success': False,
             'message': f'Erro interno: {str(e)}'
         })
+
+@dashboard_bp.route('/api/elevadores/gerenciar', methods=['POST'])
+@api_auth_required 
+def gerenciar_elevador():
+    """
+    API para gerenciar o status de elevadores individuais (marcar como parado/ativo/suspenso).
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'message': 'Dados JSON ausentes.'}), 400
+
+    acao = data.get('acao') # 'adicionar', 'editar', 'remover' (remover do status de parado)
+    id_elevador = data.get('id') # ID do elevador individual
+    
+    planilha_url = current_app.config.get('PLANILHA_URL')
+    if not planilha_url:
+        return jsonify({'success': False, 'message': 'URL da planilha não configurada.'}), 500
+
+    sheets_service = SheetsService()
+    data_processor = DataProcessor()
+
+    try:
+        # Carregamos a versão mais recente dos dados da aba 'info_elevadores' do cache
+        # O cache guarda o df_info_elevadores_current que representa o estado atual da planilha
+        # e a lista de objetos Elevator (all_elevators_current) que é o estado atual em memória.
+        all_elevators_current, _, processed_data_current = obter_dados_cached()
+        df_info_elevadores_original = processed_data_current['df_info_elevadores_current'] 
+
+        if not all_elevators_current or df_info_elevadores_original.empty:
+            return jsonify({'success': False, 'message': 'Dados de elevadores não carregados no cache ou planilha vazia.'}), 500
+
+        elevador_a_modificar: Optional[Elevator] = None
+
+        if acao in ['adicionar', 'editar']:
+            if id_elevador is None:
+                return jsonify({'success': False, 'message': 'ID do elevador é obrigatório para adicionar/editar.'}), 400
+            
+            elevador_a_modificar = data_processor.get_elevator_by_id(all_elevators_current, id_elevador)
+            if not elevador_a_modificar:
+                 return jsonify({'success': False, 'message': f'Elevador com ID {id_elevador} não encontrado.'}), 404
+
+            # Atualiza o status e as datas no objeto Elevator em memória
+            elevador_a_modificar.status = data.get('status', 'Parado')
+            elevador_a_modificar.data_de_parada = data.get('data_de_parada')
+            elevador_a_modificar.previsao_de_retorno = data.get('previsao_de_retorno')
+
+            message = f"Elevador ID {id_elevador} (Prédio ID: {elevador_a_modificar.id_predio}) atualizado para status '{elevador_a_modificar.status}'."
+
+        elif acao == 'remover': # Alterar de "Parado" para "Em atividade"
+            if id_elevador is None:
+                return jsonify({'success': False, 'message': 'ID do elevador é obrigatório para remover.'}), 400
+            
+            elevador_a_modificar = data_processor.get_elevator_by_id(all_elevators_current, id_elevador)
+            if not elevador_a_modificar:
+                return jsonify({'success': False, 'message': f'Elevador com ID {id_elevador} não encontrado.'}), 404
+            
+            elevador_a_modificar.status = 'Em atividade'
+            elevador_a_modificar.data_de_parada = None
+            elevador_a_modificar.previsao_de_retorno = None
+            message = f"Elevador ID {id_elevador} (Prédio ID: {elevador_a_modificar.id_predio}) alterado para 'Em atividade' e datas limpas."
+
+        else:
+            return jsonify({'success': False, 'message': 'Ação inválida.'}), 400
+        
+        # Prepara o DataFrame atualizado para escrita na planilha 'info_elevadores'
+        df_to_save = data_processor.prepare_df_info_elevadores_for_write(all_elevators_current, df_info_elevadores_original)
+
+        # Salva o DataFrame modificado de volta na planilha
+        if sheets_service.salvar_elevadores_individuais(planilha_url, df_to_save):
+            # Limpa o cache para forçar a recarga dos dados atualizados na próxima requisição
+            global _dados_cache
+            _dados_cache = {k: None for k in _dados_cache} # Limpa tudo
+            return jsonify({'success': True, 'message': message}), 200
+        else:
+            return jsonify({'success': False, 'message': 'Falha ao salvar dados na planilha.'}), 500
+
+    except Exception as e:
+        current_app.logger.exception(f"Erro na API de gerenciar elevador: {e}")
+        return jsonify({'success': False, 'message': f'Ocorreu um erro interno: {str(e)}'}), 500

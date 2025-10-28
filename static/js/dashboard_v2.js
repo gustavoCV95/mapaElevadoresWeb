@@ -3,15 +3,57 @@
 // ========== FASE 5: FILTROS INTERATIVOS ==========
 
 // Variáveis globais
-let dadosOriginais = initialGeojsonData;
+let dadosOriginais = initialGeojsonData; 
 let mapaLeaflet = null;
-let marcadoresAtuais = []; // NOVO: Controla marcadores atuais
-let stats_detalhadas_inicial = initialDetailedStats
+let marcadoresAtuais = [];
+let allElevators = allElevatorsLoaded; 
+let allBuildings = buildingsForForm; 
 
-// Inicializa o mapa
+
+// Eventos e inicializações
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Dashboard v2.0 carregado com gerenciamento de elevadores.');
+    
+    // NOVO: Iniciar o mapa SOMENTE UMA VEZ
+    // A condição do setTimeout é para quando o elemento #mapa não está visível imediatamente (ex: em abas ocultas)
+    // Se o mapa for visível, chame direto. Senão, use o setTimeout.
+    const mapaElement = document.getElementById('mapa');
+    if (mapaElement && (mapaElement.offsetWidth === 0 || mapaElement.offsetHeight === 0)) {
+        setTimeout(function() {
+            console.log('DEBUG: inicializarMapa() chamado via setTimeout');
+            inicializarMapa();
+            // Outras inicializações que dependem do mapa visível ou dados carregados
+            configurarFiltrosAutomaticos();
+            atualizarElevadoresParadosTabela(initialDetailedStats.elevadores_parados || []);
+            setupElevadorManagement(); 
+        }, 100); 
+    } else if (mapaElement) { // Mapa visível e elemento existe
+        console.log('DEBUG: inicializarMapa() chamado diretamente');
+        inicializarMapa();
+        // Outras inicializações que dependem do mapa visível ou dados carregados
+        configurarFiltrosAutomaticos();
+        atualizarElevadoresParadosTabela(initialDetailedStats.elevadores_parados || []);
+        setupElevadorManagement(); 
+    } else {
+        console.error('ERRO: Elemento #mapa não encontrado no DOM!');
+        // No caso de não haver mapa, ainda precisamos configurar outras partes
+        configurarFiltrosAutomaticos();
+        atualizarElevadoresParadosTabela(initialDetailedStats.elevadores_parados || []);
+        setupElevadorManagement(); 
+    }
+});
+
+
+// O seu `inicializarMapa` estava assim:
 function inicializarMapa() {
     console.log('Inicializando mapa v2.0 com filtros...');
     
+    // CORRIGIDO: Verifica se o mapa já foi inicializado para evitar o erro.
+    if (mapaLeaflet) {
+        console.warn('Mapa já inicializado. Pulando segunda inicialização.');
+        return;
+    }
+
     mapaLeaflet = L.map('mapa').setView([-19.92, -43.92], 7);
 
     console.log('Tamanho interno do mapa Leaflet (mapaLeaflet._size):', mapaLeaflet._size);
@@ -20,7 +62,8 @@ function inicializarMapa() {
         attribution: '© OpenStreetMap contributors, © CartoDB'
     }).addTo(mapaLeaflet);
     
-    adicionarMarcadores(dadosOriginais);
+    // CORRIGIDO: Usa a variável global dadosOriginais que agora foi definida
+    adicionarMarcadores(dadosOriginais); 
 }
 
 // NOVO: Remove todos os marcadores
@@ -40,8 +83,6 @@ function adicionarMarcadores(geojsonData) {
         console.warn("Nenhum dado GeoJSON ou features para adicionar marcadores.");
         return;
     }    
-
-    // if (!geojsonData || !geojsonData.features) return;
     
     console.log(`Adicionando ${geojsonData.features.length} marcadores...`);
  
@@ -64,53 +105,54 @@ function adicionarMarcadores(geojsonData) {
         const latlng = [coords[1], coords[0]];      
 
         const marker = L.circleMarker(latlng,{
-            radius: props.tamanhoMarcador,
-            fillColor: props.corMarcador,
-            color: props.corMarcador,
+            radius: props.tamanho_marcador_grupo, 
+            fillColor: props.cor_marcador_grupo,   
+            color: props.cor_marcador_grupo,
             weight: 2,
             opacity: 1,
             fillOpacity: 0.8
-        })
+        });
         
         // Tooltip
-        let tooltipText = `${props.cidade} - ${props.tipo}<br/>
-        ${props.qtd_elev} elevadores - ${props.marcaLicitacao}<br/>
-        ${props.regiao} - ${props.status}`;
-        if(props.nElevadorParado && props.nElevadorParado > 0){
-            tooltipText += `<br/><strong style="color: ${props.corMarcador ||'#dc3545'};">${props.nElevadorParado} parado(s)</strong>`;
-        }
+        let tooltipText = `${props.cidade} - ${props.unidade} (${props.total_elevadores_grupo} elevadores)<br/>
+        Status Predominante: ${props.status_grupo_prioritario}`;
         marker.bindTooltip(tooltipText,{sticky:true});
         
-        // Popup
+        // Popup para grupos: lista os elevadores individuais do grupo
         let popupContent = `<div style="font-family: Arial, sans-serif;">
-            <h4 style="margin: 0 0 10px 0; color: #333;">${props.unidade}</h4>
-            <p><strong>Cidade:</strong> ${props.cidade}</p>
+            <h4 style="margin: 0 0 10px 0; color: #333;">${props.cidade} - ${props.unidade}</h4>
             <p><strong>Endereço:</strong> ${props.endereco}</p>
-            <p><strong>Tipo:</strong> ${props.tipo}</p>
-            <p><strong>Elevadores:</strong> ${props.qtd_elev}</p>
-            <p><strong>Paradas:</strong> ${props.paradas}</p>
-            <p><strong>Marca:</strong> ${props.marca}</p>
-            <p><strong>Empresa:</strong> ${props.empresa}</p>
-            <p><strong>Status:</strong> <span style="color: ${props.corMarcador};">${props.status}</span></p>`;
+            <p><strong>Total de Elevadores:</strong> ${props.total_elevadores_grupo}</p>
+            <p><strong>Status Predominante:</strong> <span style="color: ${props.cor_marcador_grupo};">${props.status_grupo_prioritario}</span></p>
+            <hr>
+            <h6>Elevadores Individuais:</h6>
+            <ul style="list-style: none; padding-left: 0;">`;
         
-        if ((props.nElevadorParado && props.nElevadorParado > 0) || props.status && props.status.toLowerCase().includes('suspenso')) {    
-            if (props.nElevadorParado && props.nElevadorParado > 0) {
-                popupContent += `<hr style="margin: 10px 0;"><p style="color: #dc3545;"><strong>⚠️ Elevadores Parados:</strong> ${props.nElevadorParado}</p>`;
+        props.elevadores_no_grupo.forEach(elev => {
+            const statusColor = elev.status.toLowerCase() === 'parado' ? '#dc3545' :
+                                elev.status.toLowerCase() === 'suspenso' ? '#ffc107' :
+                                '#28a745';
+            popupContent += `
+                <li style="margin-bottom: 5px;">
+                    <strong>ID: ${elev.id}</strong> - ${elev.descricao}<br/>
+                    Tipo: ${elev.tipo}, Marca: ${elev.marca}<br/>
+                    Status: <span style="color: ${statusColor};">${elev.status}</span>`;
+            if (elev.data_de_parada) {
+                popupContent += `<br/>Parado desde: ${elev.data_de_parada}`;
             }
-            if (props.dataDeParada) {
-                popupContent += `<p style="color: #dc3545;"><strong>📅 Data da Parada:</strong> ${props.dataDeParada}</p>`;
+            if (elev.previsao_de_retorno) {
+                popupContent += `<br/>Previsão: ${elev.previsao_de_retorno}`;
             }
-            if (props.previsaoDeRetorno) {
-                popupContent += `<p style="color: #dc3545;"><strong>🔄 Previsão de Retorno:</strong> ${props.previsaoDeRetorno}</p>`;
-            }
-        }
-        popupContent += '</div>';
+            popupContent += `</li>`;
+        });
+        popupContent += `</ul></div>`;
         
-        marker.bindPopup(popupContent, {maxWidth: 350});
+        marker.bindPopup(popupContent, {maxWidth: 400});
         marker.addTo(mapaLeaflet);
         marcadoresAtuais.push(marker);
     });
 }
+
 
 // NOVO: Aplica filtros E atualiza o mapa
 function aplicarFiltros() {
@@ -266,10 +308,15 @@ function limparFiltros() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
+                // GeoJSON agora vem agrupado
+                adicionarMarcadores(data.data.geojson); 
                 atualizarCards(data.data.stats);
-                ajustarZoomParaDados(data.data.geojson);
-                atualizarElevadoresParados(data.data.stats_detalhadas.elevadores_parados || []);
+                
+                // elevadores_parados também são objetos Elevator
+                atualizarElevadoresParadosTabela(data.data.stats_detalhadas.elevadores_parados || []);
                 atualizarStatsDetalhadas(data.data.stats_detalhadas);
+            } else {
+                console.error('Erro ao limpar filtros via API:', data.message);
             }
         })
         .catch(error => console.error('Erro ao restaurar dados:', error));
@@ -402,27 +449,396 @@ function atualizarDados() {
         });
 }
 
-// ATUALIZADO: Inicializa quando a página carrega
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Dashboard v2.0 carregado com filtros interativos');
-    const mapaElement = document.getElementById('mapa');
-    if (mapaElement) {
-        // Verifique as dimensões do mapaElement ANTES de inicializar
-        console.log('Dimensões do elemento #mapa:', mapaElement.offsetWidth, mapaElement.offsetHeight);
-        if (mapaElement.offsetWidth === 0 || mapaElement.offsetHeight === 0) {
-            console.error('Elemento #mapa está com dimensões zero. Isso pode causar problemas de renderização do Leaflet.');
-            // Tente forçar um pequeno delay para a inicialização do mapa
-            setTimeout(function() {
-                inicializarMapa();
-                configurarFiltrosAutomaticos();
-                atualizarElevadoresParados(stats_detalhadas_inicial.elevadores_parados || []);
-            }, 100); // Pequeno delay
-        } else {
-            inicializarMapa();
-            configurarFiltrosAutomaticos();
-            atualizarElevadoresParados(stats_detalhadas_inicial.elevadores_parados || []);
+function atualizarElevadoresParadosTabela(elevadoresParadosList) {
+    const tbody = document.getElementById('elevadores-parados-tbody');
+    if (!tbody) return;
+    
+    let html = '';
+    if (!elevadoresParadosList || elevadoresParadosList.length === 0) {
+        html = `
+            <tr>
+                <td colspan="7" class="text-center text-muted py-3">
+                    <i class="fas fa-check-circle text-success"></i> 
+                    Nenhum elevador parado
+                </td>
+            </tr>
+        `;
+    } else {
+        elevadoresParadosList.forEach(elevador => {
+            html += `
+                <tr class="elevador-row-hover">
+                    <td>${elevador.unidade} - ${elevador.cidade}</td>
+                    <td>${elevador.tipo}</td>
+                    <td>${elevador.marca}</td>
+                    <td>${elevador.descricao} (ID: ${elevador.id})</td>
+                    <td>${elevador.DataDeParada || 'N/A'}</td>
+                    <td>${elevador.PrevisaoDeRetorno || 'N/A'}</td>
+                    <td>
+                        <span class="acao-elevador-parado">
+                            <button class="btn btn-sm btn-info btn-edit-elevador" data-id="${elevador.id}" title="Editar Status"><i class="fas fa-pencil-alt"></i></button>
+                            <button class="btn btn-sm btn-danger btn-delete-elevador" data-id="${elevador.id}" title="Marcar como Em Atividade"><i class="fas fa-times"></i></button>
+                        </span>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+    tbody.innerHTML = html;
+
+    // Adiciona event listeners aos novos botões de edição/exclusão
+    document.querySelectorAll('.btn-edit-elevador').forEach(button => {
+        button.addEventListener('click', function(event) {
+            event.stopPropagation(); // Previne que o evento se propague para a linha
+            abrirModalGerenciarElevador('editar', parseInt(this.dataset.id));
+        });
+    });
+    document.querySelectorAll('.btn-delete-elevador').forEach(button => {
+        button.addEventListener('click', function(event) {
+            event.stopPropagation(); // Previne que o evento se propague para a linha
+            confirmarRemocaoElevador(parseInt(this.dataset.id));
+        });
+    });
+}
+
+// ATUALIZADO: updateDatalistsAndCheckAutofill para usar Building e Elevator
+function updateDatalistsAndCheckAutofill() {
+    const cidadeInput = document.getElementById('form-cidade');
+    const unidadeInput = document.getElementById('form-unidade');
+    const enderecoInput = document.getElementById('form-endereco');
+    const elevadoresList = document.getElementById('elevadores-list');
+
+    const currentCidade = cidadeInput.value.toLowerCase().trim();
+    const currentUnidade = unidadeInput.value.toLowerCase().trim();
+    const currentEndereco = enderecoInput.value.toLowerCase().trim();
+
+    let filteredBuildings = allBuildings.filter(b => {
+        const matchesCidade = !currentCidade || b.cidade.toLowerCase().includes(currentCidade);
+        const matchesUnidade = !currentUnidade || b.unidade.toLowerCase().includes(currentUnidade);
+        const matchesEndereco = !currentEndereco || b.endereco.toLowerCase().includes(currentEndereco);
+        return matchesCidade && matchesUnidade && matchesEndereco;
+    });
+
+    if (currentCidade && currentUnidade && currentEndereco && filteredBuildings.length === 1) {
+        cidadeInput.value = filteredBuildings[0].cidade;
+        unidadeInput.value = filteredBuildings[0].unidade;
+        enderecoInput.value = filteredBuildings[0].endereco;
+        populateElevadoresDatalistForBuilding(filteredBuildings[0].id);
+    } else {
+        elevadoresList.innerHTML = ''; // Limpa a lista de elevadores se o prédio não estiver único
+        document.getElementById('form-elevador-descricao').value = '';
+        document.getElementById('form-id-elevador-unico').value = '';
+
+        // Se o usuário está digitando nos campos de localização, preenche a datalist de elevadores
+        // com elevadores que correspondem aos critérios parciais.
+        const filteredElevatorsByLocation = allElevators.filter(e => {
+            const matchesCidade = !currentCidade || e.cidade.toLowerCase().includes(currentCidade);
+            const matchesUnidade = !currentUnidade || e.unidade.toLowerCase().includes(currentUnidade);
+            const matchesEndereco = !currentEndereco || e.endereco.toLowerCase().includes(currentEndereco);
+            return matchesCidade && matchesUnidade && matchesEndereco;
+        });
+        const uniqueElevadoresLocais = new Set();
+        filteredElevatorsByLocation.forEach(elev => uniqueElevadoresLocais.add(`${elev.descricao} (ID: ${elev.id})`));
+        elevadoresList.innerHTML = Array.from(uniqueElevadoresLocais).map(e => `<option value="${e}">`).join('');
+    }
+}
+
+function setupElevadorManagement() {
+    const btnAdicionar = document.getElementById('btnAdicionarElevadorParado');
+    const btnSalvar = document.getElementById('btnSalvarElevador'); // CORRIGIDO: Usar ID correto do HTML
+    
+    // Verifica se os botões existem antes de adicionar o listener
+    if (btnAdicionar) {
+        btnAdicionar.addEventListener('click', function() {
+            abrirModalGerenciarElevador('adicionar');
+        });
+    } else {
+        console.error('ERRO: Botão #btnAdicionarElevadorParado não encontrado.');
+    }
+
+    if (btnSalvar) {
+        btnSalvar.addEventListener('click', salvarGerenciamentoElevador);
+    } else {
+        console.error('ERRO: Botão #btnSalvarElevador (dentro do modal) não encontrado.');
+    }
+
+    // Configurar listeners para autocompletar e auto-preencher para os campos do formulário do modal
+    const formCidade = document.getElementById('form-cidade');
+    const formUnidade = document.getElementById('form-unidade');
+    const formEndereco = document.getElementById('form-endereco');
+    const formElevadorId = document.getElementById('form-id-elevador'); // CORRIGIDO: ID no HTML é 'form-id-elevador'
+
+    if (formCidade) formCidade.addEventListener('input', updateDatalistsAndCheckAutofill);
+    else console.error('ERRO: Campo #form-cidade (modal) não encontrado.');
+    if (formUnidade) formUnidade.addEventListener('input', updateDatalistsAndCheckAutofill);
+    else console.error('ERRO: Campo #form-unidade (modal) não encontrado.');
+    if (formEndereco) formEndereco.addEventListener('input', updateDatalistsAndCheckAutofill);
+    else console.error('ERRO: Campo #form-endereco (modal) não encontrado.');
+    if (formElevadorId) formElevadorId.addEventListener('input', autoPreencherElevadorInfo); // CORRIGIDO: ID correto
+    else console.error('ERRO: Campo #form-id-elevador (modal) não encontrado.');
+    
+    preencherDatalistsLocais();
+}
+
+function preencherDatalistsLocais() {
+    const cidadesList = document.getElementById('cidades-list');
+    const unidadesList = document.getElementById('unidades-list');
+    const enderecosList = document.getElementById('enderecos-list');
+    
+    const uniqueCidades = new Set();
+    const uniqueUnidades = new Set();
+    const uniqueEnderecos = new Set();
+
+    allBuildings.forEach(b => { // Usa a lista de Building para preencher
+        uniqueCidades.add(b.cidade);
+        uniqueUnidades.add(b.unidade);
+        uniqueEnderecos.add(b.endereco);
+    });
+
+    cidadesList.innerHTML = Array.from(uniqueCidades).map(c => `<option value="${c}">`).join('');
+    unidadesList.innerHTML = Array.from(uniqueUnidades).map(u => `<option value="${u}">`).join('');
+    enderecosList.innerHTML = Array.from(uniqueEnderecos).map(e => `<option value="${e}">`).join('');
+}
+
+function updateDatalistsAndCheckAutofill() {
+    const cidadeInput = document.getElementById('form-cidade');
+    const unidadeInput = document.getElementById('form-unidade');
+    const enderecoInput = document.getElementById('form-endereco');
+    const elevadoresList = document.getElementById('elevadores-list');
+
+    const currentCidade = cidadeInput.value.toLowerCase().trim();
+    const currentUnidade = unidadeInput.value.toLowerCase().trim();
+    const currentEndereco = enderecoInput.value.toLowerCase().trim();
+
+    // 1. Autofill para Cidade/Unidade/Endereço
+    let matchingBuildings = allBuildings.filter(b => {
+        const matchesCidade = !currentCidade || b.cidade.toLowerCase().includes(currentCidade);
+        const matchesUnidade = !currentUnidade || b.unidade.toLowerCase().includes(currentUnidade);
+        const matchesEndereco = !currentEndereco || b.endereco.toLowerCase().includes(currentEndereco);
+        return matchesCidade && matchesUnidade && matchesEndereco;
+    });
+
+    // Se houver apenas um prédio correspondente, preenche os campos
+    if (matchingBuildings.length === 1 && (currentCidade && currentUnidade && currentEndereco)) { // só auto-preenche se todos os 3 campos estiverem preenchidos e houver match único
+        cidadeInput.value = matchingBuildings[0].cidade;
+        unidadeInput.value = matchingBuildings[0].unidade;
+        enderecoInput.value = matchingBuildings[0].endereco;
+        // Chamar a função de preencher elevadores para este prédio
+        populateElevadoresDatalistForBuilding(matchingBuildings[0].id);
+    } else {
+        // Se houver múltiplos ou nenhum, limpa a datalist de elevadores e tenta preencher
+        // a datalist de elevadores com base nos filtros parciais dos campos de localização
+        const filteredElevators = allElevators.filter(e => {
+            const matchesCidade = !currentCidade || e.cidade.toLowerCase().includes(currentCidade);
+            const matchesUnidade = !currentUnidade || e.unidade.toLowerCase().includes(currentUnidade);
+            const matchesEndereco = !currentEndereco || e.endereco.toLowerCase().includes(currentEndereco);
+            return matchesCidade && matchesUnidade && matchesEndereco;
+        });
+        const uniqueElevadoresLocais = new Set();
+        filteredElevators.forEach(elev => uniqueElevadoresLocais.add(`${elev.descricao} (ID: ${elev.id})`));
+        elevadoresList.innerHTML = Array.from(uniqueElevadoresLocais).map(e => `<option value="${e}">`).join('');
+
+        // Se o prédio não está unicamente identificado, limpa o campo de elevador e o id hidden
+        document.getElementById('form-elevador-descricao').value = '';
+        document.getElementById('form-id-elevador-unico').value = '';
+    }
+}
+
+function populateElevadoresDatalistForBuilding(buildingId) {
+    const elevadoresList = document.getElementById('elevadores-list');
+    const elevadoresDoPredio = allElevators.filter(e => e.id_predio === buildingId);
+    
+    if (elevadoresDoPredio.length === 1) {
+        // Auto-preenche se só houver 1 elevador no prédio
+        const elev = elevadoresDoPredio[0];
+        document.getElementById('form-elevador-descricao').value = `${elev.descricao} (ID: ${elev.id})`;
+        document.getElementById('form-id-elevador-unico').value = elev.id;
+    }
+
+    elevadoresList.innerHTML = elevadoresDoPredio
+        .map(elev => `<option value="${elev.descricao} (ID: ${elev.id})">`)
+        .join('');
+}
+
+function autoPreencherElevadorInfo() {
+    const formIdElevador = document.getElementById('form-id-elevador'); // CORRIGIDO: ID correto
+    if (!formIdElevador) {
+        console.error('ERRO: Campo #form-id-elevador não encontrado em autoPreencherElevadorInfo.');
+        return;
+    }
+    const elevadorValue = formIdElevador.value;
+    const idMatch = elevadorValue.match(/\(ID: (\d+)\)/); 
+
+    const formCidade = document.getElementById('form-cidade');
+    const formUnidade = document.getElementById('form-unidade');
+    const formEndereco = document.getElementById('form-endereco');
+    const formIdElevadorUnico = document.getElementById('form-id-elevador-unico');
+
+    if (idMatch) {
+        const idElevador = parseInt(idMatch[1]);
+        const elevador = allElevators.find(e => e.id === idElevador);
+        if (elevador) {
+            if (formCidade) formCidade.value = elevador.cidade;
+            if (formUnidade) formUnidade.value = elevador.unidade;
+            if (formEndereco) formEndereco.value = elevador.endereco;
+            
+            if (formCidade) formCidade.disabled = true;
+            if (formUnidade) formUnidade.disabled = true;
+            if (formEndereco) formEndereco.disabled = true;
+            formIdElevador.disabled = true; // CORRIGIDO: Use formIdElevador diretamente
+            
+            if (formIdElevadorUnico) formIdElevadorUnico.value = elevador.id;
         }
     } else {
-        console.error('Elemento #mapa não encontrado no DOM!');
+        if (formIdElevadorUnico) formIdElevadorUnico.value = '';
+        if (formCidade) formCidade.disabled = false;
+        if (formUnidade) formUnidade.disabled = false;
+        if (formEndereco) formEndereco.disabled = false;
+        formIdElevador.disabled = false; // CORRIGIDO: Use formIdElevador diretamente
     }
-});
+}
+
+function abrirModalGerenciarElevador(modo, idElevador = null) {
+    const modalElement = document.getElementById('modalGerenciarElevador');
+    const modal = new bootstrap.Modal(modalElement);
+    const form = document.getElementById('formGerenciarElevador');
+    form.reset(); // Limpa o formulário
+
+    const modalTitle = document.getElementById('modalGerenciarElevadorLabel');
+    const btnSalvar = document.getElementById('btnSalvarElevador'); // CORRIGIDO: ID correto
+    
+    // CORRIGIDO: Certifique-se de que os elementos existem antes de tentar acessá-los e modificar
+    const formCidade = document.getElementById('form-cidade');
+    const formUnidade = document.getElementById('form-unidade');
+    const formEndereco = document.getElementById('form-endereco');
+    const formIdElevador = document.getElementById('form-id-elevador'); // CORRIGIDO: ID correto
+    const formIdElevadorUnico = document.getElementById('form-id-elevador-unico');
+    const formDataParada = document.getElementById('form-data-parada');
+    const formPrevisaoRetorno = document.getElementById('form-previsao-retorno');
+    const formStatus = document.getElementById('form-status');
+
+    // Reabilita todos os campos por padrão para o modo 'adicionar'
+    if (formCidade) formCidade.disabled = false;
+    if (formUnidade) formUnidade.disabled = false;
+    if (formEndereco) formEndereco.disabled = false;
+    if (formIdElevador) formIdElevador.disabled = false; // CORRIGIDO
+    
+    if (modo === 'adicionar') {
+        if (modalTitle) modalTitle.textContent = 'Inserir Elevador Parado';
+        if (btnSalvar) {
+            btnSalvar.textContent = 'Inserir';
+            btnSalvar.dataset.acao = 'adicionar';
+        }
+        if (formStatus) formStatus.value = 'Parado'; 
+        if (formIdElevadorUnico) formIdElevadorUnico.value = ''; 
+        
+        const elevadoresListDatalist = document.getElementById('elevadores-list');
+        if (elevadoresListDatalist) elevadoresListDatalist.innerHTML = ''; 
+        
+        preencherDatalistsLocais();
+    } else if (modo === 'editar') {
+        if (modalTitle) modalTitle.textContent = 'Editar Elevador';
+        if (btnSalvar) {
+            btnSalvar.textContent = 'Salvar Edição';
+            btnSalvar.dataset.acao = 'editar';
+        }
+        
+        const elevador = allElevators.find(e => e.id === idElevador);
+        if (elevador) {
+            if (formIdElevadorUnico) formIdElevadorUnico.value = elevador.id;
+            if (formCidade) formCidade.value = elevador.cidade;
+            if (formUnidade) formUnidade.value = elevador.unidade;
+            if (formEndereco) formEndereco.value = elevador.endereco;
+            if (formIdElevador) formIdElevador.value = `${elevador.descricao} (ID: ${elevador.id})`; // CORRIGIDO
+            if (formDataParada) formDataParada.value = elevador.DataDeParada;
+            if (formPrevisaoRetorno) formPrevisaoRetorno.value = elevador.PrevisaoDeRetorno;
+            if (formStatus) formStatus.value = elevador.status;
+
+            // Desabilita os campos de localização/elevador para edição de um existente
+            if (formCidade) formCidade.disabled = true;
+            if (formUnidade) formUnidade.disabled = true;
+            if (formEndereco) formEndereco.disabled = true;
+            if (formIdElevador) formIdElevador.disabled = true; // CORRIGIDO
+        } else {
+            alert('Elevador não encontrado para edição.');
+            return;
+        }
+    }
+    modal.show();
+}
+
+function salvarGerenciamentoElevador() {
+    const acao = document.getElementById('btnSalvarGerenciamentoElevador').dataset.acao;
+    const idElevador = parseInt(document.getElementById('form-id-elevador-unico').value);
+    const dataDeParada = document.getElementById('form-data-parada').value || null;
+    const previsaoDeRetorno = document.getElementById('form-previsao-retorno').value || null;
+    const status = document.getElementById('form-status').value;
+
+    if (!idElevador) {
+         alert('Erro: ID do elevador não identificado. Selecione um elevador válido antes de salvar.');
+         return;
+    }
+    
+    const payload = {
+        acao: acao,
+        id: idElevador,
+        status: status,
+        data_de_parada: dataDeParada,
+        previsao_de_retorno: previsaoDeRetorno
+    };
+
+    fetch('/v2/api/elevadores/gerenciar', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            const modalElement = document.getElementById('modalGerenciarElevador');
+            const modal = bootstrap.Modal.getInstance(modalElement);
+            if (modal) modal.hide();
+            location.reload(); // Recarrega a página para buscar os dados atualizados
+        } else {
+            alert('Erro: ' + data.message);
+            console.error('API Error:', data);
+        }
+    })
+    .catch(error => {
+        console.error('Erro na requisição da API:', error);
+        alert('Erro na comunicação com o servidor.');
+    });
+}
+
+function confirmarRemocaoElevador(idElevador) {
+    if (confirm('Tem certeza que deseja marcar este elevador como "Em atividade" e limpar as datas de parada?')) {
+        const payload = {
+            acao: 'remover', 
+            id: idElevador
+        };
+
+        fetch('/v2/api/elevadores/gerenciar', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('Erro ao marcar como ativo: ' + data.message);
+                console.error('API Error:', data);
+            }
+        })
+        .catch(error => {
+            console.error('Erro na requisição da API:', error);
+            alert('Erro na comunicação com o servidor.');
+        });
+    }
+}
