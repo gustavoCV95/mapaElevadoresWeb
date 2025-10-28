@@ -471,8 +471,8 @@ function atualizarElevadoresParadosTabela(elevadoresParadosList) {
                     <td>${elevador.tipo}</td>
                     <td>${elevador.marca}</td>
                     <td>${elevador.descricao} (ID: ${elevador.id})</td>
-                    <td>${elevador.DataDeParada || 'N/A'}</td>
-                    <td>${elevador.PrevisaoDeRetorno || 'N/A'}</td>
+                    <td style="text-align: center;">${elevador.DataDeParada || '-'}</td>
+                    <td style="text-align: center;">${elevador.PrevisaoDeRetorno || '-'}</td>
                     <td>
                         <span class="acao-elevador-parado">
                             <button class="btn btn-sm btn-info btn-edit-elevador" data-id="${elevador.id}" title="Editar Status"><i class="fas fa-pencil-alt"></i></button>
@@ -580,68 +580,123 @@ function setupElevadorManagement() {
 }
 
 function preencherDatalistsLocais() {
-    const cidadesList = document.getElementById('cidades-list');
-    const unidadesList = document.getElementById('unidades-list');
-    const enderecosList = document.getElementById('enderecos-list');
-    
-    const uniqueCidades = new Set();
-    const uniqueUnidades = new Set();
-    const uniqueEnderecos = new Set();
+    // CORRIGIDO: Verificar se as datalists existem antes de preenchê-las
+    const datalists = {
+        cidades: document.getElementById('cidades-list'),
+        unidades: document.getElementById('unidades-list'),
+        enderecos: document.getElementById('enderecos-list'),
+        elevadores: document.getElementById('elevadores-list')
+    };
 
-    allBuildings.forEach(b => { // Usa a lista de Building para preencher
-        uniqueCidades.add(b.cidade);
-        uniqueUnidades.add(b.unidade);
-        uniqueEnderecos.add(b.endereco);
-    });
+    if (datalists.cidades) {
+        const cidadesUnicas = [...new Set(allElevators.map(e => e.cidade))].sort();
+        datalists.cidades.innerHTML = '';
+        cidadesUnicas.forEach(cidade => {
+            const option = document.createElement('option');
+            option.value = cidade;
+            datalists.cidades.appendChild(option);
+        });
+    }
 
-    cidadesList.innerHTML = Array.from(uniqueCidades).map(c => `<option value="${c}">`).join('');
-    unidadesList.innerHTML = Array.from(uniqueUnidades).map(u => `<option value="${u}">`).join('');
-    enderecosList.innerHTML = Array.from(uniqueEnderecos).map(e => `<option value="${e}">`).join('');
+    if (datalists.unidades) {
+        const unidadesUnicas = [...new Set(allElevators.map(e => e.unidade))].sort();
+        datalists.unidades.innerHTML = '';
+        unidadesUnicas.forEach(unidade => {
+            const option = document.createElement('option');
+            option.value = unidade;
+            datalists.unidades.appendChild(option);
+        });
+    }
+
+    if (datalists.enderecos) {
+        const enderecosUnicos = [...new Set(allElevators.map(e => e.endereco))].sort();
+        datalists.enderecos.innerHTML = '';
+        enderecosUnicos.forEach(endereco => {
+            const option = document.createElement('option');
+            option.value = endereco;
+            datalists.enderecos.appendChild(option);
+        });
+    }
+
+    if (datalists.elevadores) {
+        datalists.elevadores.innerHTML = '';
+        allElevators.forEach(elev => {
+            const option = document.createElement('option');
+            option.value = `${elev.descricao} (ID: ${elev.id})`;
+            datalists.elevadores.appendChild(option);
+        });
+    }
 }
 
 function updateDatalistsAndCheckAutofill() {
-    const cidadeInput = document.getElementById('form-cidade');
-    const unidadeInput = document.getElementById('form-unidade');
-    const enderecoInput = document.getElementById('form-endereco');
-    const elevadoresList = document.getElementById('elevadores-list');
-
-    const currentCidade = cidadeInput.value.toLowerCase().trim();
-    const currentUnidade = unidadeInput.value.toLowerCase().trim();
-    const currentEndereco = enderecoInput.value.toLowerCase().trim();
-
-    // 1. Autofill para Cidade/Unidade/Endereço
-    let matchingBuildings = allBuildings.filter(b => {
-        const matchesCidade = !currentCidade || b.cidade.toLowerCase().includes(currentCidade);
-        const matchesUnidade = !currentUnidade || b.unidade.toLowerCase().includes(currentUnidade);
-        const matchesEndereco = !currentEndereco || b.endereco.toLowerCase().includes(currentEndereco);
-        return matchesCidade && matchesUnidade && matchesEndereco;
-    });
-
-    // Se houver apenas um prédio correspondente, preenche os campos
-    if (matchingBuildings.length === 1 && (currentCidade && currentUnidade && currentEndereco)) { // só auto-preenche se todos os 3 campos estiverem preenchidos e houver match único
-        cidadeInput.value = matchingBuildings[0].cidade;
-        unidadeInput.value = matchingBuildings[0].unidade;
-        enderecoInput.value = matchingBuildings[0].endereco;
-        // Chamar a função de preencher elevadores para este prédio
-        populateElevadoresDatalistForBuilding(matchingBuildings[0].id);
-    } else {
-        // Se houver múltiplos ou nenhum, limpa a datalist de elevadores e tenta preencher
-        // a datalist de elevadores com base nos filtros parciais dos campos de localização
-        const filteredElevators = allElevators.filter(e => {
-            const matchesCidade = !currentCidade || e.cidade.toLowerCase().includes(currentCidade);
-            const matchesUnidade = !currentUnidade || e.unidade.toLowerCase().includes(currentUnidade);
-            const matchesEndereco = !currentEndereco || e.endereco.toLowerCase().includes(currentEndereco);
-            return matchesCidade && matchesUnidade && matchesEndereco;
-        });
-        const uniqueElevadoresLocais = new Set();
-        filteredElevators.forEach(elev => uniqueElevadoresLocais.add(`${elev.descricao} (ID: ${elev.id})`));
-        elevadoresList.innerHTML = Array.from(uniqueElevadoresLocais).map(e => `<option value="${e}">`).join('');
-
-        // Se o prédio não está unicamente identificado, limpa o campo de elevador e o id hidden
-        document.getElementById('form-elevador-descricao').value = '';
-        document.getElementById('form-id-elevador-unico').value = '';
+    // CORRIGIDO: Verificar se os elementos existem antes de acessá-los
+    const formCidade = document.getElementById('form-cidade');
+    const formUnidade = document.getElementById('form-unidade');
+    const formEndereco = document.getElementById('form-endereco');
+    
+    if (!formCidade || !formUnidade || !formEndereco) {
+        console.error('ERRO: Elementos do formulário não encontrados em updateDatalistsAndCheckAutofill');
+        return;
     }
-}
+
+    const cidade = formCidade.value.trim();
+    const unidade = formUnidade.value.trim();
+    const endereco = formEndereco.value.trim();
+
+    // Atualizar datalists dinamicamente baseado na seleção atual
+    const unidadesListDatalist = document.getElementById('unidades-list');
+    const enderecosListDatalist = document.getElementById('enderecos-list');
+    const elevadoresListDatalist = document.getElementById('elevadores-list');
+
+    // Filtrar unidades por cidade
+    if (cidade && unidadesListDatalist) {
+        const unidadesFiltradas = [...new Set(
+            allElevators
+                .filter(e => e.cidade.toLowerCase().includes(cidade.toLowerCase()))
+                .map(e => e.unidade)
+        )];
+        
+        unidadesListDatalist.innerHTML = '';
+        unidadesFiltradas.forEach(u => {
+            const option = document.createElement('option');
+            option.value = u;
+            unidadesListDatalist.appendChild(option);
+        });
+    }
+
+    // Filtrar endereços por cidade e unidade
+    if (cidade && unidade && enderecosListDatalist) {
+        const enderecosFiltrados = [...new Set(
+            allElevators
+                .filter(e => e.cidade.toLowerCase().includes(cidade.toLowerCase()) && 
+                            e.unidade.toLowerCase().includes(unidade.toLowerCase()))
+                .map(e => e.endereco)
+        )];
+        
+        enderecosListDatalist.innerHTML = '';
+        enderecosFiltrados.forEach(end => {
+            const option = document.createElement('option');
+            option.value = end;
+            enderecosListDatalist.appendChild(option);
+        });
+    }
+
+    // Filtrar elevadores por localização completa
+    if (cidade && unidade && endereco && elevadoresListDatalist) {
+        const elevadoresFiltrados = allElevators.filter(e => 
+            e.cidade.toLowerCase().includes(cidade.toLowerCase()) && 
+            e.unidade.toLowerCase().includes(unidade.toLowerCase()) && 
+            e.endereco.toLowerCase().includes(endereco.toLowerCase())
+        );
+        
+        elevadoresListDatalist.innerHTML = '';
+        elevadoresFiltrados.forEach(elev => {
+            const option = document.createElement('option');
+            option.value = `${elev.descricao} (ID: ${elev.id})`;
+            elevadoresListDatalist.appendChild(option);
+        });
+    }
+}   
 
 function populateElevadoresDatalistForBuilding(buildingId) {
     const elevadoresList = document.getElementById('elevadores-list');
@@ -660,40 +715,46 @@ function populateElevadoresDatalistForBuilding(buildingId) {
 }
 
 function autoPreencherElevadorInfo() {
-    const formIdElevador = document.getElementById('form-id-elevador'); // CORRIGIDO: ID correto
+    const formIdElevador = document.getElementById('form-id-elevador');
     if (!formIdElevador) {
-        console.error('ERRO: Campo #form-id-elevador não encontrado em autoPreencherElevadorInfo.');
+        console.error('ERRO: Campo #form-id-elevador não encontrado em autoPreencherElevadorInfo');
         return;
     }
-    const elevadorValue = formIdElevador.value;
-    const idMatch = elevadorValue.match(/\(ID: (\d+)\)/); 
 
-    const formCidade = document.getElementById('form-cidade');
-    const formUnidade = document.getElementById('form-unidade');
-    const formEndereco = document.getElementById('form-endereco');
-    const formIdElevadorUnico = document.getElementById('form-id-elevador-unico');
+    const elevadorValue = formIdElevador.value;
+    const idMatch = elevadorValue.match(/\(ID: (\d+)\)/);
+
+    // CORRIGIDO: Verificar todos os elementos antes de acessá-los
+    const formElements = {
+        cidade: document.getElementById('form-cidade'),
+        unidade: document.getElementById('form-unidade'),
+        endereco: document.getElementById('form-endereco'),
+        idElevadorUnico: document.getElementById('form-id-elevador-unico')
+    };
 
     if (idMatch) {
         const idElevador = parseInt(idMatch[1]);
         const elevador = allElevators.find(e => e.id === idElevador);
+        
         if (elevador) {
-            if (formCidade) formCidade.value = elevador.cidade;
-            if (formUnidade) formUnidade.value = elevador.unidade;
-            if (formEndereco) formEndereco.value = elevador.endereco;
+            if (formElements.cidade) formElements.cidade.value = elevador.cidade;
+            if (formElements.unidade) formElements.unidade.value = elevador.unidade;
+            if (formElements.endereco) formElements.endereco.value = elevador.endereco;
+            if (formElements.idElevadorUnico) formElements.idElevadorUnico.value = elevador.id;
             
-            if (formCidade) formCidade.disabled = true;
-            if (formUnidade) formUnidade.disabled = true;
-            if (formEndereco) formEndereco.disabled = true;
-            formIdElevador.disabled = true; // CORRIGIDO: Use formIdElevador diretamente
-            
-            if (formIdElevadorUnico) formIdElevadorUnico.value = elevador.id;
+            // Desabilitar campos preenchidos automaticamente
+            if (formElements.cidade) formElements.cidade.disabled = true;
+            if (formElements.unidade) formElements.unidade.disabled = true;
+            if (formElements.endereco) formElements.endereco.disabled = true;
+            formIdElevador.disabled = true;
         }
     } else {
-        if (formIdElevadorUnico) formIdElevadorUnico.value = '';
-        if (formCidade) formCidade.disabled = false;
-        if (formUnidade) formUnidade.disabled = false;
-        if (formEndereco) formEndereco.disabled = false;
-        formIdElevador.disabled = false; // CORRIGIDO: Use formIdElevador diretamente
+        // Limpar e reabilitar campos
+        if (formElements.idElevadorUnico) formElements.idElevadorUnico.value = '';
+        if (formElements.cidade) formElements.cidade.disabled = false;
+        if (formElements.unidade) formElements.unidade.disabled = false;
+        if (formElements.endereco) formElements.endereco.disabled = false;
+        formIdElevador.disabled = false;
     }
 }
 
@@ -704,23 +765,24 @@ function abrirModalGerenciarElevador(modo, idElevador = null) {
     form.reset(); // Limpa o formulário
 
     const modalTitle = document.getElementById('modalGerenciarElevadorLabel');
-    const btnSalvar = document.getElementById('btnSalvarElevador'); // CORRIGIDO: ID correto
+    const btnSalvar = document.getElementById('btnSalvarElevador');
     
-    // CORRIGIDO: Certifique-se de que os elementos existem antes de tentar acessá-los e modificar
-    const formCidade = document.getElementById('form-cidade');
-    const formUnidade = document.getElementById('form-unidade');
-    const formEndereco = document.getElementById('form-endereco');
-    const formIdElevador = document.getElementById('form-id-elevador'); // CORRIGIDO: ID correto
-    const formIdElevadorUnico = document.getElementById('form-id-elevador-unico');
-    const formDataParada = document.getElementById('form-data-parada');
-    const formPrevisaoRetorno = document.getElementById('form-previsao-retorno');
-    const formStatus = document.getElementById('form-status');
+    // Verificar se os elementos existem
+    const formElements = {
+        cidade: document.getElementById('form-cidade'),
+        unidade: document.getElementById('form-unidade'),
+        endereco: document.getElementById('form-endereco'),
+        idElevador: document.getElementById('form-id-elevador'),
+        idElevadorUnico: document.getElementById('form-id-elevador-unico'),
+        dataParada: document.getElementById('form-data-parada'),
+        previsaoRetorno: document.getElementById('form-previsao-retorno'),
+        status: document.getElementById('form-status')
+    };
 
     // Reabilita todos os campos por padrão para o modo 'adicionar'
-    if (formCidade) formCidade.disabled = false;
-    if (formUnidade) formUnidade.disabled = false;
-    if (formEndereco) formEndereco.disabled = false;
-    if (formIdElevador) formIdElevador.disabled = false; // CORRIGIDO
+    Object.values(formElements).forEach(element => {
+        if (element) element.disabled = false;
+    });
     
     if (modo === 'adicionar') {
         if (modalTitle) modalTitle.textContent = 'Inserir Elevador Parado';
@@ -728,13 +790,14 @@ function abrirModalGerenciarElevador(modo, idElevador = null) {
             btnSalvar.textContent = 'Inserir';
             btnSalvar.dataset.acao = 'adicionar';
         }
-        if (formStatus) formStatus.value = 'Parado'; 
-        if (formIdElevadorUnico) formIdElevadorUnico.value = ''; 
+        if (formElements.status) formElements.status.value = 'Parado'; 
+        if (formElements.idElevadorUnico) formElements.idElevadorUnico.value = ''; 
         
         const elevadoresListDatalist = document.getElementById('elevadores-list');
         if (elevadoresListDatalist) elevadoresListDatalist.innerHTML = ''; 
         
         preencherDatalistsLocais();
+        
     } else if (modo === 'editar') {
         if (modalTitle) modalTitle.textContent = 'Editar Elevador';
         if (btnSalvar) {
@@ -744,20 +807,20 @@ function abrirModalGerenciarElevador(modo, idElevador = null) {
         
         const elevador = allElevators.find(e => e.id === idElevador);
         if (elevador) {
-            if (formIdElevadorUnico) formIdElevadorUnico.value = elevador.id;
-            if (formCidade) formCidade.value = elevador.cidade;
-            if (formUnidade) formUnidade.value = elevador.unidade;
-            if (formEndereco) formEndereco.value = elevador.endereco;
-            if (formIdElevador) formIdElevador.value = `${elevador.descricao} (ID: ${elevador.id})`; // CORRIGIDO
-            if (formDataParada) formDataParada.value = elevador.DataDeParada;
-            if (formPrevisaoRetorno) formPrevisaoRetorno.value = elevador.PrevisaoDeRetorno;
-            if (formStatus) formStatus.value = elevador.status;
+            if (formElements.idElevadorUnico) formElements.idElevadorUnico.value = elevador.id;
+            if (formElements.cidade) formElements.cidade.value = elevador.cidade;
+            if (formElements.unidade) formElements.unidade.value = elevador.unidade;
+            if (formElements.endereco) formElements.endereco.value = elevador.endereco;
+            if (formElements.idElevador) formElements.idElevador.value = `${elevador.descricao} (ID: ${elevador.id})`;
+            if (formElements.dataParada) formElements.dataParada.value = elevador.DataDeParada || '';
+            if (formElements.previsaoRetorno) formElements.previsaoRetorno.value = elevador.PrevisaoDeRetorno || '';
+            if (formElements.status) formElements.status.value = elevador.status;
 
-            // Desabilita os campos de localização/elevador para edição de um existente
-            if (formCidade) formCidade.disabled = true;
-            if (formUnidade) formUnidade.disabled = true;
-            if (formEndereco) formEndereco.disabled = true;
-            if (formIdElevador) formIdElevador.disabled = true; // CORRIGIDO
+            // Desabilitar campos de localização/elevador para edição de um existente
+            if (formElements.cidade) formElements.cidade.disabled = true;
+            if (formElements.unidade) formElements.unidade.disabled = true;
+            if (formElements.endereco) formElements.endereco.disabled = true;
+            if (formElements.idElevador) formElements.idElevador.disabled = true;
         } else {
             alert('Elevador não encontrado para edição.');
             return;
@@ -767,78 +830,158 @@ function abrirModalGerenciarElevador(modo, idElevador = null) {
 }
 
 function salvarGerenciamentoElevador() {
-    const acao = document.getElementById('btnSalvarGerenciamentoElevador').dataset.acao;
-    const idElevador = parseInt(document.getElementById('form-id-elevador-unico').value);
-    const dataDeParada = document.getElementById('form-data-parada').value || null;
-    const previsaoDeRetorno = document.getElementById('form-previsao-retorno').value || null;
-    const status = document.getElementById('form-status').value;
-
-    if (!idElevador) {
-         alert('Erro: ID do elevador não identificado. Selecione um elevador válido antes de salvar.');
-         return;
-    }
+    console.log('DEBUG: salvarGerenciamentoElevador chamado');
     
-    const payload = {
-        acao: acao,
-        id: idElevador,
-        status: status,
-        data_de_parada: dataDeParada,
-        previsao_de_retorno: previsaoDeRetorno
+    const btnSalvar = document.getElementById('btnSalvarElevador');
+    if (!btnSalvar) {
+        console.error('ERRO: Botão salvar não encontrado');
+        return;
+    }
+
+    const acao = btnSalvar.dataset.acao || 'adicionar';
+    console.log(`DEBUG: Ação detectada: ${acao}`);
+
+    // Verificar todos os elementos do formulário antes de acessá-los
+    const formElements = {
+        cidade: document.getElementById('form-cidade'),
+        unidade: document.getElementById('form-unidade'),
+        endereco: document.getElementById('form-endereco'),
+        idElevador: document.getElementById('form-id-elevador'),
+        idElevadorUnico: document.getElementById('form-id-elevador-unico'),
+        dataParada: document.getElementById('form-data-parada'),
+        previsaoRetorno: document.getElementById('form-previsao-retorno'),
+        status: document.getElementById('form-status')
     };
 
+    // Verificar se todos os elementos necessários existem
+    const missingElements = Object.entries(formElements).filter(([key, element]) => !element);
+    if (missingElements.length > 0) {
+        console.error('ERRO: Elementos do formulário não encontrados:', missingElements.map(([key]) => key));
+        alert('Erro: Alguns campos do formulário não foram encontrados. Verifique o console para detalhes.');
+        return;
+    }
+
+    // Validação básica
+    if (!formElements.cidade.value.trim() || !formElements.unidade.value.trim() || 
+        !formElements.endereco.value.trim() || !formElements.status.value) {
+        alert('Por favor, preencha todos os campos obrigatórios: Cidade, Unidade, Endereço e Status.');
+        return;
+    }
+
+    // CORRIGIDO: Preparar payload para corresponder à rota existente
+    let elevadorId = null;
+    
+    // Se há um ID no campo oculto, usar esse (para elevadores existentes)
+    if (formElements.idElevadorUnico.value.trim()) {
+        elevadorId = parseInt(formElements.idElevadorUnico.value.trim());
+    } else {
+        // Se não há ID no campo oculto, tentar extrair do campo de descrição
+        const elevadorValue = formElements.idElevador.value.trim();
+        const idMatch = elevadorValue.match(/\(ID: (\d+)\)/);
+        if (idMatch) {
+            elevadorId = parseInt(idMatch[1]);
+        }
+    }
+
+    // Verificar se conseguimos obter um ID válido para ações que requerem ID
+    if ((acao === 'adicionar' || acao === 'editar') && !elevadorId) {
+        alert('Erro: Não foi possível identificar o ID do elevador. Certifique-se de selecionar um elevador válido da lista.');
+        return;
+    }
+
+    const payload = {
+        acao: acao,
+        id: elevadorId, // CORRIGIDO: Usar 'id' em vez de 'elevador.id_elevador_unico'
+        status: formElements.status.value,
+        data_de_parada: formElements.dataParada.value || null,
+        previsao_de_retorno: formElements.previsaoRetorno.value || null
+    };
+
+    console.log('DEBUG: Payload para envio:', payload);
+
+    // Desabilitar botão para evitar múltiplos cliques
+    btnSalvar.disabled = true;
+    btnSalvar.textContent = 'Salvando...';
+
+    // CORRIGIDO: URL da rota
     fetch('/v2/api/elevadores/gerenciar', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload)
     })
     .then(response => response.json())
     .then(data => {
+        console.log('DEBUG: Resposta do servidor:', data);
+        
+        // CORRIGIDO: Usar 'success' e 'message' conforme a rota existente
         if (data.success) {
-            alert(data.message);
-            const modalElement = document.getElementById('modalGerenciarElevador');
-            const modal = bootstrap.Modal.getInstance(modalElement);
-            if (modal) modal.hide();
-            location.reload(); // Recarrega a página para buscar os dados atualizados
+            alert(data.message || 'Operação realizada com sucesso!');
+            
+            // Fechar modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modalGerenciarElevador'));
+            if (modal) {
+                modal.hide();
+            }
+            
+            // Recarregar dados do dashboard
+            setTimeout(() => {
+                location.reload(); // Recarrega a página para atualizar os dados
+            }, 1000);
+            
         } else {
-            alert('Erro: ' + data.message);
-            console.error('API Error:', data);
+            alert('Erro: ' + (data.message || 'Erro desconhecido ao salvar.'));
         }
     })
     .catch(error => {
-        console.error('Erro na requisição da API:', error);
-        alert('Erro na comunicação com o servidor.');
+        console.error('ERRO na requisição:', error);
+        alert('Erro de conexão: ' + error.message);
+    })
+    .finally(() => {
+        // Reabilitar botão
+        btnSalvar.disabled = false;
+        btnSalvar.textContent = acao === 'adicionar' ? 'Inserir' : 'Salvar Edição';
     });
 }
 
 function confirmarRemocaoElevador(idElevador) {
-    if (confirm('Tem certeza que deseja marcar este elevador como "Em atividade" e limpar as datas de parada?')) {
-        const payload = {
-            acao: 'remover', 
-            id: idElevador
-        };
-
-        fetch('/v2/api/elevadores/gerenciar', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert(data.message);
-                location.reload();
-            } else {
-                alert('Erro ao marcar como ativo: ' + data.message);
-                console.error('API Error:', data);
-            }
-        })
-        .catch(error => {
-            console.error('Erro na requisição da API:', error);
-            alert('Erro na comunicação com o servidor.');
-        });
+    if (!confirm('Tem certeza de que deseja marcar este elevador como "Em atividade"?')) {
+        return;
     }
+
+    console.log(`DEBUG: Removendo elevador ID ${idElevador} do status parado`);
+
+    const payload = {
+        acao: 'remover',
+        id: idElevador
+    };
+
+    fetch('/v2/api/elevadores/gerenciar', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('DEBUG: Resposta do servidor:', data);
+        
+        if (data.success) {
+            alert(data.message || 'Elevador marcado como ativo com sucesso!');
+            
+            // Recarregar dados do dashboard
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+            
+        } else {
+            alert('Erro: ' + (data.message || 'Erro desconhecido ao remover.'));
+        }
+    })
+    .catch(error => {
+        console.error('ERRO na requisição:', error);
+        alert('Erro de conexão: ' + error.message);
+    });
 }
