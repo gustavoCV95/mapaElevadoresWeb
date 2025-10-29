@@ -19,7 +19,6 @@ class DataProcessor:
         self.raw_data = data
         self.processed_data = None
 
-
     def process_all_elevators_and_buildings_data(self, df_detalhado: pd.DataFrame, df_info_elevadores: pd.DataFrame) -> Dict[str, Any]:
         """
         Processa dados de prédios e elevadores, correlaciona-os e cria objetos Building e Elevator.
@@ -310,6 +309,13 @@ class DataProcessor:
                     e.endereco.lower() == endereco.lower()]
         return filtered
 
+    def _format_date_string_for_sheet(self, date_value: Optional[str]) -> str:
+        date_str = str(date_value) if date_value is not None else ''
+        if '-' in date_str and len(date_str) == 10: # Heurística simples para YYYY-MM-DD
+            try: return datetime.strptime(date_str, '%Y-%m-%d').strftime('%d/%m/%y')
+            except ValueError: pass # Se falhar, use a string original
+        return date_str
+
     # NOVO: Método para preparar o DataFrame 'info_elevadores' para escrita
     def prepare_df_info_elevadores_for_write(self, all_elevators: List[Elevator], original_df_info_elevadores: pd.DataFrame) -> pd.DataFrame:
         if original_df_info_elevadores.empty:
@@ -320,17 +326,32 @@ class DataProcessor:
         for elev_obj in all_elevators:
             # Verifica se o ID do elevador é None antes de tentar usá-lo
             if elev_obj.id is None:
-                print(f"   ⚠️ Elevador com ID None encontrado. Não será atualizado no DataFrame.")
+                print(f"Elevador com ID None encontrado. Não será atualizado no DataFrame.")
                 continue
 
             idx = df_updated[df_updated['id'] == elev_obj.id].index
             if not idx.empty:
                 df_updated.loc[idx, 'status'] = elev_obj.status
                 # Garante que None seja convertido para string vazia para a planilha
-                df_updated.loc[idx, 'DataDeParada'] = elev_obj.data_de_parada if elev_obj.data_de_parada is not None else '' 
-                df_updated.loc[idx, 'PrevisaoDeRetorno'] = elev_obj.previsao_de_retorno if elev_obj.previsao_de_retorno is not None else ''
+                #df_updated.loc[idx, 'DataDeParada'] = elev_obj.data_de_parada if elev_obj.data_de_parada is not None else '' 
+                #df_updated.loc[idx, 'PrevisaoDeRetorno'] = elev_obj.previsao_de_retorno if elev_obj.previsao_de_retorno is not None else ''
+                df_updated.loc[idx, 'DataDeParada'] = self._format_date_string_for_sheet(elev_obj.data_de_parada) if elev_obj.data_de_parada is not None else '' 
+                df_updated.loc[idx, 'PrevisaoDeRetorno'] = self._format_date_string_for_sheet(elev_obj.previsao_de_retorno) if elev_obj.previsao_de_retorno is not None else ''
+                
+                if elev_obj.latitude is not None:
+                    # Converte o float para string e substitui '.' por ','
+                    df_updated.loc[idx, 'latitude'] = str(elev_obj.latitude)
+                else:
+                    df_updated.loc[idx, 'latitude'] = '' # Garante que seja string vazia se for None
+
+                if elev_obj.longitude is not None:
+                    # Converte o float para string e substitui '.' por ','
+                    df_updated.loc[idx, 'longitude'] = str(elev_obj.longitude)
+                else:
+                    df_updated.loc[idx, 'longitude'] = '' # Garante que seja string vazia se for None            
+
             else:
-                print(f"   ⚠️ Elevador com ID {elev_obj.id} não encontrado no DataFrame original para atualização.")
+                print(f"Elevador com ID {elev_obj.id} não encontrado no DataFrame original para atualização.")
         
         return df_updated
 
