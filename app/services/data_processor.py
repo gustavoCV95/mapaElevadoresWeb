@@ -354,10 +354,6 @@ class DataProcessor:
                 print(f"Elevador com ID {elev_obj.id} não encontrado no DataFrame original para atualização.")
         
         return df_updated
-
-
-    # --- Métodos de Filtro (apply_filters) e Cálculo de Stats (atualizados) ---
-    # Estes métodos operam sobre a lista de objetos Elevator (individuais)
     
     def apply_filters(self, elevators: List[Elevator], tipos=None, regioes=None, 
                     marcas=None, empresas=None, situacoes=None) -> tuple[List[Elevator], List[str]]:

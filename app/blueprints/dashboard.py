@@ -260,9 +260,29 @@ def gerenciar_elevador():
             elevador_a_modificar = data_processor.get_elevator_by_id(all_elevators_current, id_elevador)
             if not elevador_a_modificar:
                  return jsonify({'success': False, 'message': f'Elevador com ID {id_elevador} não encontrado.'}), 404
+            
+            new_status = data.get('status','Parado')
+            original_status = elevador_a_modificar.status # Pega o status atual do elevador ANTES da mudança
+
+            if new_status.lower() == 'parado' and original_status.lower() == 'parado':
+                # Permitir a edição se o status *não mudou* para 'parado'
+                # mas o elevador já está parado. Apenas avançar e permitir atualização de datas.
+                pass 
+            elif new_status.lower() == 'suspenso' and original_status.lower() == 'suspenso':
+                # Similar para "Suspenso"
+                pass
+            elif (new_status.lower() == 'parado' or new_status.lower() == 'suspenso') and \
+                 (original_status.lower() == 'parado' or original_status.lower() == 'suspenso'):
+                # Caso o usuário tente mudar de "Parado" para "Suspenso" ou vice-versa,
+                # E ele já está em um desses estados, isso é uma edição válida.
+                # Não bloqueamos aqui.
+                pass
+            elif (new_status.lower() == 'parado' or new_status.lower() == 'suspenso') and \
+                 (original_status.lower() != 'parado' and original_status.lower() != 'suspenso'):
+                pass     
 
             # Atualiza o status e as datas no objeto Elevator em memória
-            elevador_a_modificar.status = data.get('status', 'Parado')
+            elevador_a_modificar.status = new_status
             elevador_a_modificar.data_de_parada = data.get('data_de_parada')
             elevador_a_modificar.previsao_de_retorno = data.get('previsao_de_retorno')
 
