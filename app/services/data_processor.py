@@ -25,24 +25,8 @@ class DataProcessor:
         Gera GeoJSON agrupado por localização.
         """
 
-        with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
-            arq.write(f"DEBUG: DataProcessor - Início do processamento. df_detalhado: {len(df_detalhado)} linhas, df_info_elevadores: {len(df_info_elevadores)} linhas.")
-            arq.write('\n')
-
         # --- PONTO DE INSPEÇÃO 0: Verificar 'montacarga' no df_info_elevadores original ---
         print("\nDEBUG: Verificando tipo 'montacarga' no df_info_elevadores original:")
-        # Converter a coluna 'tipo' para string antes de usar .lower() e .contains() para evitar erros com tipos não string ou NaN.
-        df_montacarga_raw = df_info_elevadores[df_info_elevadores['tipo'].astype(str).str.lower().str.contains('montacarga', na=False)]
-        print(f"DEBUG: Encontrados {len(df_montacarga_raw)} registros com 'montacarga' (case-insensitive) no df_info_elevadores raw.")
-        with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
-            arq.write(f"DEBUG: Encontrados {len(df_montacarga_raw)} registros com 'montacarga' (case-insensitive) no df_info_elevadores raw.")
-        if not df_montacarga_raw.empty:
-            print("\nDEBUG: Verificando tipo 'montacarga' no df_info_elevadores original:\nDEBUG: Detalhes dos primeiros 5 elevadores 'montacarga' no df_info_elevadores raw (ID, tipo, lat, lon):")
-            # Adicione 'id' e 'id_predio' aqui para depuração também
-            print(df_montacarga_raw[['id', 'id_predio', 'tipo', 'latitude', 'longitude']].head().to_string())
-        else:
-            with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
-                arq.write("DEBUG: Nenhum elevador do tipo 'montacarga' encontrado no df_info_elevadores raw.")
 
         if df_detalhado.empty or df_info_elevadores.empty:
             print("❌ Um dos DataFrames de prédios ou elevadores está vazio. Não é possível processar.")
@@ -154,31 +138,12 @@ class DataProcessor:
         
         # --- 4. Preparar saída para o dashboard (GeoJSON AGRUPADO) ---
         geojson_data = self._create_grouped_geojson(elevators)
-        with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
-            arq.write(f"\nDEBUG: GeoJSON criado. {len(geojson_data['features'])} features (grupos de elevadores) geradas.")
-        
-        montacarga_features_geojson = [
-        f for f in geojson_data['features'] 
-        if any('montacarga' in elev_detail['tipo'].lower() for elev_detail in f['properties']['elevadores_no_grupo'])
-        ]
-        with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
-            arq.write(f"DEBUG: Encontradas {len(montacarga_features_geojson)} features GeoJSON contendo elevadores 'montacarga'.")
-        if not montacarga_features_geojson:
-            with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
-                arq.write("DEBUG: Nenhuma feature GeoJSON no mapa contém elevadores 'montacarga'. Isso pode ser devido a coordenadas inválidas/ausentes para esses elevadores, ou eles foram descartados antes do GeoJSON.")
- 
  
         # Listas únicas para filtros da UI (baseados em elevadores)
         tipos_unicos = sorted(list(set([e.tipo for e in elevators])))
-        with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
-            arq.write(f"\nDEBUG: Tipos únicos gerados para filtros: {tipos_unicos}")
-        if 'montacarga' not in [t.lower() for t in tipos_unicos]:
-            with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
-                arq.write("DEBUG: 'montacarga' (case-insensitive) NÃO está na lista de tipos únicos. Verifique a grafia no raw data, ou se todos os 'montacarga' foram descartados antes desta etapa.")
         regioes_unicas = sorted(list(set([e.regiao for e in elevators])))
         marcas_unicas = sorted(list(set([e.marca_licitacao for e in elevators])))
         empresas_unicas = sorted(list(set([e.empresa for e in elevators if e.empresa])))
-
         buildings_for_form = [b.to_dict() for b in buildings] # Chama o to_dict() atualizado do Building
 
         return {
@@ -210,11 +175,7 @@ class DataProcessor:
 
     # NOVO: Método para criar GeoJSON agrupado por localização
     def _create_grouped_geojson(self, elevators: List[Elevator]) -> Dict[str, Any]:
-        with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
-            arq.write(f"DEBUG: _create_grouped_geojson - Processando {len(elevators)} elevadores para agrupamento.")
         grouped_elevators = defaultdict(list)
-        elevators_skipped_no_coords_for_geojson = 0
-        montacarga_skipped_geojson = 0 # Contador específico para montacarga
         for elev in elevators:
             # Garante que latitude e longitude não são None ou np.nan antes de usar como chave
             if elev.latitude is not None and not np.isnan(elev.latitude) and \
@@ -222,16 +183,6 @@ class DataProcessor:
                 key = (elev.latitude, elev.longitude)
                 grouped_elevators[key].append(elev)
             else:
-                if elev.tipo and 'montacarga' in elev.tipo.lower():
-                    with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
-                        arq.write(f"DEBUG: Elevador 'montacarga' ID {elev.id} pulado no GeoJSON por coordenadas inválidas/ausentes: Lat='{elev.latitude}', Lon='{elev.longitude}'.")
-                    montacarga_skipped_geojson += 1
-                else:
-                    with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
-                        arq.write(f"DEBUG: Elevador ID {elev.id} ('{elev.tipo}') pulado no GeoJSON por coordenadas inválidas/ausentes.")
-                    elevators_skipped_no_coords_for_geojson += 1
-                with open(r"C:\Users\gusta\OneDrive\Área de Trabalho\Debug.txt", 'a') as arq:
-                    arq.write(f"DEBUG: {len(grouped_elevators)} grupos de elevadores criados. ({elevators_skipped_no_coords_for_geojson} elevadores ignorados por falta de coordenadas para GeoJSON, dos quais {montacarga_skipped_geojson} eram 'montacarga').")  
                 print(f"Elevador ID {elev.id} sem coordenadas válidas. Pulando no agrupamento GeoJSON.")
 
 
@@ -432,7 +383,7 @@ class DataProcessor:
         """
         if not elevators:
             return {
-                'por_tipo': {}, 'por_regiao': {}, 'por_marca': {}, 'por_status': {},
+                'por_tipo': {}, 'por_regiao': {}, 'por_marca': {}, 'por_empresa': {}, 'por_status': {},
                 'elevadores_parados': [] 
             }
         
@@ -441,6 +392,7 @@ class DataProcessor:
             'por_regiao': defaultdict(int),
             'por_marca': defaultdict(int),
             'por_status': defaultdict(int),
+            'por_empresa': defaultdict(int),
             'elevadores_parados': []
         }
         
@@ -449,20 +401,23 @@ class DataProcessor:
                 stats['por_tipo'][elevator.tipo] += 1
                 stats['por_regiao'][elevator.regiao] += 1
                 stats['por_marca'][elevator.marca_licitacao] += 1
+                stats['por_empresa'][elevator.empresa] += 1
                 stats['por_status']['Suspensos'] += 1
             elif elevator.is_parado:
                 stats['por_tipo'][elevator.tipo] += 1
                 stats['por_regiao'][elevator.regiao] += 1
                 stats['por_marca'][elevator.marca_licitacao] += 1
+                stats['por_empresa'][elevator.empresa] += 1
                 stats['por_status']['Parados'] += 1
                 stats['elevadores_parados'].append(elevator.to_dict())
             else: # Em atividade
                 stats['por_tipo'][elevator.tipo] += 1
                 stats['por_regiao'][elevator.regiao] += 1
                 stats['por_marca'][elevator.marca_licitacao] += 1
+                stats['por_empresa'][elevator.empresa] += 1
                 stats['por_status']['Em atividade'] += 1
         
-        for categoria in ['por_tipo', 'por_regiao', 'por_marca', 'por_status']:
+        for categoria in ['por_tipo', 'por_regiao', 'por_marca', 'por_empresa', 'por_status']:
             stats[categoria] = dict(sorted(stats[categoria].items(), key=lambda x: x[1], reverse=True))
         
         print(f"Métricas detalhadas calculadas.")

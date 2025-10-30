@@ -86,7 +86,7 @@ def index():
 
         print(f"KPIs: Dashboard carregado. Total chamados: {metricas_iniciais.get('total_chamados', 0)}")
         
-        return render_template('v2/kpis.html',
+        return render_template('kpis.html',
                              metricas=metricas_iniciais,
                              categorias_unicas=categorias_unicas,
                              edificios_unicos=edificios_unicos,
@@ -96,7 +96,7 @@ def index():
     except Exception as e:
         print(f"KPIs: Erro no dashboard: {e}")
         current_app.logger.exception(f"Erro ao carregar dashboard de KPIs: {e}") # Usando o logger
-        return render_template('v2/kpis.html',
+        return render_template('kpis.html',
                              erro=f"Erro interno ao carregar KPIs: {str(e)}",
                              usuario=AuthService.get_current_user())
 

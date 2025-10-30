@@ -79,22 +79,17 @@
 {% endblock %}
 
 {% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-building"></i> 
+            Sistema de Mapeamento de Elevadores - TJMG
+        </h1>
+    </div>
+</div>
+
     <div class="container-fluid mt-3">
-        <!-- Banner de Comparação -->
-        <div class="comparison-banner">
-            <div class="row align-items-center">
-                <div class="col-md-8">
-                    <h5><i class="fas fa-rocket"></i> Nova Arquitetura Modular</h5>
-                    <p class="mb-0">Você está usando a versão 2.0 com arquitetura modular. 
-                    Compare com o <a href="http://localhost:5000"  class="text-white"><u>sistema atual</u></a></p>
-                </div>
-                <div class="col-md-4 text-end">
-                    <button class="btn btn-light btn-sm" onclick="atualizarDados()">
-                        <i class="fas fa-sync-alt"></i> Atualizar Dados
-                    </button>
-                </div>
-            </div>
-        </div>
 
         {% if erro %}
         <!-- Erro -->
@@ -204,7 +199,7 @@
                     <div class="card-body">
                         <div class="row">
                             <!-- Por Tipo -->
-                            <div class="col-md-3">
+                            <div class="col">
                                 <h6><i class="fas fa-building"></i> Por Tipo</h6>
                                 <div id="stats-por-tipo" class="stats-list">
                                     {% if stats_detalhadas and stats_detalhadas.por_tipo %}
@@ -221,7 +216,7 @@
                             </div>
                             
                             <!-- Por Região -->
-                            <div class="col-md-3">
+                            <div class="col">
                                 <h6><i class="fas fa-map"></i> Por Região</h6>
                                 <div id="stats-por-regiao" class="stats-list">
                                     {% if stats_detalhadas and stats_detalhadas.por_regiao %}
@@ -238,7 +233,7 @@
                             </div>
                             
                             <!-- Por Marca -->
-                            <div class="col-md-3">
+                            <div class="col">
                                 <h6><i class="fas fa-tag"></i> Por Marca</h6>
                                 <div id="stats-por-marca" class="stats-list">
                                     {% if stats_detalhadas and stats_detalhadas.por_marca %}
@@ -253,9 +248,26 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            
+
+                            <!-- Por Empresa -->
+                            <div class="col">
+                                <h6><i class="fas fa-industry"></i> Por Empresa</h6>
+                                <div id="stats-por-empresa" class="stats-list">
+                                    {% if stats_detalhadas and stats_detalhadas.por_empresa %}
+                                        {% for empresa, quantidade in stats_detalhadas.por_empresa.items() %}
+                                        <div class="d-flex justify-content-between">
+                                            <span>{{ empresa }}:</span>
+                                            <strong>{{ quantidade }}</strong>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <div class="text-muted">Carregando...</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
                             <!-- Por Status -->
-                            <div class="col-md-3">
+                            <div class="col">
                                 <h6><i class="fas fa-traffic-light"></i> Por Status</h6>
                                 <div id="stats-por-status" class="stats-list">
                                     {% if stats_detalhadas and stats_detalhadas.por_status %}
@@ -374,8 +386,11 @@
             <!-- Filtros (agora com altura total) -->
             <div class="col-md-3"> <!-- ESTE BLOCO AGORA É UM IRMÃO DO col-md-9, DENTRO DA MESMA ROW -->
                 <div class="card h-100">
-                    <div class="card-header">
+                    <div class="card-header d-flex justify-content-between align-items-center">
                         <h5><i class="fas fa-filter"></i> Filtros</h5>
+                        <button class="btn btn-light btn-sm" onclick="atualizarDados()">
+                        <i class="fas fa-sync-alt"></i> Atualizar Dados
+                    </button>
                     </div>
                     <div class="card-body">
                         <!-- Contador de Resultados -->

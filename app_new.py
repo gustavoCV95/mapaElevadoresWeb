@@ -19,7 +19,7 @@ try:
         print("\n🚀 Iniciando servidor na porta 5001...")
         print("🔗 Acesse: http://localhost:5001/")
         print("🔗 Health: http://localhost:5001/test/health")
-        app.run(debug=True, port=5001, host='127.0.0.1')
+        app.run(debug=True, port=5001, host='0.0.0.0')
         
 except Exception as e:
     print(f"❌ Erro crítico: {e}")

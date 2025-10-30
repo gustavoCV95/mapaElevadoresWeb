@@ -66,6 +66,41 @@ function inicializarMapa() {
     adicionarMarcadores(dadosOriginais); 
 }
 
+function formatStringToHtmlDate(dateString) {
+    if (!dateString) return ''; // Retorna vazio se a data for nula ou vazia
+    
+    // Tenta parsear DD/MM/YY ou DD/MM/YYYY
+    const parts = dateString.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})$/);
+    if (parts) {
+        let day = parts[1];
+        let month = parts[2];
+        let year = parts[3];
+
+        // Ajusta ano de 2 dígitos para 4 dígitos (ex: 25 -> 2025)
+        if (year.length === 2) {
+            year = (parseInt(year) < 50 ? '20' : '19') + year; // Heurística simples
+        }
+        
+        // Garante que mês e dia tenham 2 dígitos
+        month = month.padStart(2, '0');
+        day = day.padStart(2, '0');
+
+        return `${year}-${month}-${day}`; // Retorna no formato YYYY-MM-DD
+    }
+    
+    // Se já estiver YYYY-MM-DD ou outro formato, tenta passar direto
+    try {
+        const date = new Date(dateString);
+        if (!isNaN(date.getTime())) { // Verifica se é uma data válida
+            return date.toISOString().split('T')[0];
+        }
+    } catch (e) {
+        // Ignora erros de parsing se não for uma data válida
+    }
+
+    return ''; // Retorna vazio se não conseguir formatar
+}
+
 // NOVO: Remove todos os marcadores
 function limparMarcadores() {
     marcadoresAtuais.forEach(marker => {
@@ -464,7 +499,27 @@ function atualizarElevadoresParadosTabela(elevadoresParadosList) {
             </tr>
         `;
     } else {
-        elevadoresParadosList.forEach(elevador => {
+
+        const sortedElevadoresParados = elevadoresParadosList.sort((a, b) => {
+            // Função helper para converter DD/MM/YY em objeto Date válido
+            const parseDate = (dateStr) => {
+                if (!dateStr) return new Date(0); // Epoch para datas nulas
+                
+                const [day, month, year] = dateStr.split('/');
+                // Converte ano de 2 dígitos para 4 dígitos (assumindo 2000-2099)
+                const fullYear = year.length === 2 ? `20${year}` : year;
+                
+                // Retorna Date no formato correto: YYYY-MM-DD
+                return new Date(`${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+            };
+            
+            const dateA = parseDate(a.DataDeParada);
+            const dateB = parseDate(b.DataDeParada);
+            
+            return dateA - dateB; // Ordena do mais antigo para o mais recente
+        });
+
+        sortedElevadoresParados.forEach(elevador => { // AGORA USA A LISTA ORDENADA
             html += `
                 <tr class="elevador-row-hover">
                     <td>${elevador.unidade} - ${elevador.cidade}</td>
@@ -476,7 +531,7 @@ function atualizarElevadoresParadosTabela(elevadoresParadosList) {
                     <td>
                         <span class="acao-elevador-parado">
                             <button class="btn btn-sm btn-info btn-edit-elevador" data-id="${elevador.id}" title="Editar Status"><i class="fas fa-pencil-alt"></i></button>
-                            <button class="btn btn-sm btn-danger btn-delete-elevador" data-id="${elevador.id}" title="Marcar como Em Atividade"><i class="fas fa-times"></i></button>
+                            <button class="btn btn-sm btn-danger btn-delete-elevador" data-id="${elevador.id}" data-unidade="${elevador.unidade}" data-cidade="${elevador.cidade}"title="Marcar como Em Atividade"><i class="fas fa-times"></i></button>
                         </span>
                     </td>
                 </tr>
@@ -495,7 +550,7 @@ function atualizarElevadoresParadosTabela(elevadoresParadosList) {
     document.querySelectorAll('.btn-delete-elevador').forEach(button => {
         button.addEventListener('click', function(event) {
             event.stopPropagation(); // Previne que o evento se propague para a linha
-            confirmarRemocaoElevador(parseInt(this.dataset.id));
+            confirmarRemocaoElevador(parseInt(this.dataset.id), this.dataset.unidade, this.dataset.cidade);
         });
     });
 }
@@ -742,11 +797,6 @@ function autoPreencherElevadorInfo() {
             if (formElements.endereco) formElements.endereco.value = elevador.endereco;
             if (formElements.idElevadorUnico) formElements.idElevadorUnico.value = elevador.id;
             
-            // Desabilitar campos preenchidos automaticamente
-            if (formElements.cidade) formElements.cidade.disabled = true;
-            if (formElements.unidade) formElements.unidade.disabled = true;
-            if (formElements.endereco) formElements.endereco.disabled = true;
-            formIdElevador.disabled = true;
         }
     } else {
         // Limpar e reabilitar campos
@@ -807,20 +857,15 @@ function abrirModalGerenciarElevador(modo, idElevador = null) {
         
         const elevador = allElevators.find(e => e.id === idElevador);
         if (elevador) {
+
             if (formElements.idElevadorUnico) formElements.idElevadorUnico.value = elevador.id;
             if (formElements.cidade) formElements.cidade.value = elevador.cidade;
             if (formElements.unidade) formElements.unidade.value = elevador.unidade;
             if (formElements.endereco) formElements.endereco.value = elevador.endereco;
             if (formElements.idElevador) formElements.idElevador.value = `${elevador.descricao} (ID: ${elevador.id})`;
-            if (formElements.dataParada) formElements.dataParada.value = elevador.DataDeParada || '';
-            if (formElements.previsaoRetorno) formElements.previsaoRetorno.value = elevador.PrevisaoDeRetorno || '';
+            if (formElements.dataParada) formElements.dataParada.value = formatStringToHtmlDate(elevador.DataDeParada);
+            if (formElements.previsaoRetorno) formElements.previsaoRetorno.value = formatStringToHtmlDate(elevador.PrevisaoDeRetorno);
             if (formElements.status) formElements.status.value = elevador.status;
-
-            // Desabilitar campos de localização/elevador para edição de um existente
-            if (formElements.cidade) formElements.cidade.disabled = true;
-            if (formElements.unidade) formElements.unidade.disabled = true;
-            if (formElements.endereco) formElements.endereco.disabled = true;
-            if (formElements.idElevador) formElements.idElevador.disabled = true;
         } else {
             alert('Elevador não encontrado para edição.');
             return;
@@ -945,8 +990,8 @@ function salvarGerenciamentoElevador() {
     });
 }
 
-function confirmarRemocaoElevador(idElevador) {
-    if (!confirm('Tem certeza de que deseja marcar este elevador como "Em atividade"?')) {
+function confirmarRemocaoElevador(idElevador, unidade, cidade) {
+    if (!confirm(`Tem certeza de que deseja marcar o elevador ${unidade} - ${cidade}: ${idElevador} como "Em atividade"?`)) {
         return;
     }
 
