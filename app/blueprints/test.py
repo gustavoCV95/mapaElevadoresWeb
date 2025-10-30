@@ -2,29 +2,28 @@
 """
 Blueprint de teste - VERSÃO CORRIGIDA COM PREFIXO
 """
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, redirect, url_for # <-- Adicione redirect e url_for
 from datetime import datetime
+from app.services.auth_service import AuthService # <-- Adicione a importação do AuthService
 
 # Cria o blueprint
 test_bp = Blueprint('test', __name__)
 
 @test_bp.route('/')
 def index():
-    """Página inicial temporária"""
-    return jsonify({
-        'message': 'Nova arquitetura funcionando!',
-        'timestamp': datetime.now().isoformat(),
-        'routes_available': [
-            '/ (esta pÃ¡gina)',
-            '/test/health',
-            '/test/config',
-            '/test/services/models',
-            '/test/services/data-processor',
-            '/test/services/auth-service'
-        ]
-    })
+    """
+    Página inicial temporária que agora redireciona para o login ou dashboard.
+    """
+    if AuthService.is_authenticated():
+        # Redireciona para o dashboard se o usuário estiver autenticado
+        # 'dashboard.index' refere-se à função 'index' dentro do blueprint 'dashboard'
+        return redirect(url_for('dashboard.index'))
+    else:
+        # Redireciona para a página de login se o usuário não estiver autenticado
+        # 'auth.login' refere-se à função 'login' dentro do blueprint 'auth'
+        return redirect(url_for('auth.login'))
 
-# âœ… MUDANÃ‡A: Adicionar prefixo /test/ nas rotas
+# ✅ MUDANÇA: Adicionar prefixo /test/ nas rotas
 @test_bp.route('/test/health')
 def health_check():
     """Health check"""
@@ -46,7 +45,7 @@ def test_config():
         'cache_active': hasattr(current_app, 'cache_service')
     })
 
-# âœ… ROTA ADICIONAL: Status geral
+# ✅ ROTA ADICIONAL: Status geral
 @test_bp.route('/test/status')
 def status():
     """Status completo da aplicaÃ§Ã£o"""
