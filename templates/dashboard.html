@@ -48,7 +48,7 @@
         }
         /* NOVO: Estilos para estatísticas detalhadas */
         .stats-list {
-            max-height: 200px;
+            max-height: 1000px;
             overflow-y: auto;
             font-size: 14px;
         }
@@ -60,6 +60,8 @@
             border-bottom: none;
         }
         #stats-detalhadas .card-body {
+            flex: 1;
+            overflow-y: 1;
             transition: all 0.3s ease;
         }
         .elevador-row-hover:hover .acao-elevador-parado {
@@ -179,9 +181,9 @@
             </div>
         </div>
 
-        <div class="row"> <!-- ESTA É A DIV 'row' PRINCIPAL PARA MAPA E FILTROS -->
+        <div class="row" style="min-height: 70vh;"> <!-- ESTA É A DIV 'row' PRINCIPAL PARA MAPA E FILTROS -->
             <!-- Mapa e Estatísticas Detalhadas -->
-            <div class="col-md-9">
+            <div class="col-md-9 d-flex flex-column">
                 <div class="card">
                     <div class="card-header">
                         <h5><i class="fas fa-map-marked-alt"></i> Mapa dos Elevadores</h5>
@@ -192,7 +194,7 @@
                 </div>
                 
                 <!-- NOVO: Estatísticas Detalhadas (abaixo do mapa, mesma coluna) -->
-                <div class="card mt-3">
+                <div class="card mt-3 flex-fill">
                     <div class="card-header">
                         <h5><i class="fas fa-chart-bar"></i> Estatísticas Detalhadas</h5>
                     </div>
@@ -283,99 +285,6 @@
                                         <div class="text-muted">Carregando...</div>
                                     {% endif %}
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Container de Elevadores Parados (abaixo do mapa, mas ainda na coluna 9) -->
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5><i class="fas fa-exclamation-triangle text-danger"></i> Elevadores Parados</h5>
-                                <!-- NOVO BOTÃO: Adicionar Elevador Parado -->
-                                <button class="btn btn-danger btn-sm" id="btnAdicionarElevadorParado">
-                                    <i class="fas fa-plus"></i> Adicionar Elevador Parado
-                                </button>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-striped">
-                                        <thead>
-                                            <tr>
-                                                <th>Unidade/Cidade</th> <!-- Ajustado para corresponder ao JS -->
-                                                <th>Tipo</th>
-                                                <th>Marca</th>
-                                                <th>Elevador (Desc/ID)</th> <!-- Ajustado para corresponder ao JS -->
-                                                <th>Data Parada</th>
-                                                <th>Previsão Retorno</th>
-                                                <th>Ações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="elevadores-parados-tbody">
-                                            <!-- Preenchido via JavaScript -->
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- NOVO: Modal para Adicionar/Editar Elevador Parado -->
-                <div class="modal fade" id="modalGerenciarElevador" tabindex="-1" aria-labelledby="modalGerenciarElevadorLabel" aria-hidden="true">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="modalGerenciarElevadorLabel">Gerenciar Elevador Parado</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body">
-                                <form id="formGerenciarElevador">
-                                    <input type="hidden" id="form-id-elevador-unico" name="id_elevador_unico">
-                                    
-                                    <div class="mb-3">
-                                        <label for="form-cidade" class="form-label">Cidade</label>
-                                        <input type="text" class="form-control" id="form-cidade" name="cidade" required list="cidades-list">
-                                        <datalist id="cidades-list"></datalist>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="form-unidade" class="form-label">Unidade</label>
-                                        <input type="text" class="form-control" id="form-unidade" name="unidade" required list="unidades-list">
-                                        <datalist id="unidades-list"></datalist>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="form-endereco" class="form-label">Endereço</label>
-                                        <input type="text" class="form-control" id="form-endereco" name="endereco" required list="enderecos-list">
-                                        <datalist id="enderecos-list"></datalist>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="form-id-elevador" class="form-label">Número do Elevador / Descrição</label>
-                                        <input type="text" class="form-control" id="form-id-elevador" name="id_elevador" required list="elevadores-list">
-                                        <datalist id="elevadores-list"></datalist>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="form-data-parada" class="form-label">Data de Parada</label>
-                                        <input type="date" class="form-control" id="form-data-parada" name="data_de_parada">
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="form-previsao-retorno" class="form-label">Previsão de Retorno</label>
-                                        <input type="date" class="form-control" id="form-previsao-retorno" name="previsao_de_retorno">
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="form-status" class="form-label">Status</label>
-                                        <select class="form-select" id="form-status" name="status" required>
-                                            <option value="Em atividade">Em atividade</option>
-                                            <option value="Parado">Parado</option>
-                                            <option value="Suspenso">Suspenso</option>
-                                        </select>
-                                    </div>
-                                </form>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                <button type="button" class="btn btn-primary" id="btnSalvarElevador">Salvar</button>
                             </div>
                         </div>
                     </div>
@@ -515,6 +424,99 @@
                                     <span class="text-danger">🔴</span> Parados
                                 </label>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+                        <!-- Container de Elevadores Parados (abaixo do mapa, mas ainda na coluna 9) -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5><i class="fas fa-exclamation-triangle text-danger"></i> Elevadores Parados</h5>
+                            <!-- NOVO BOTÃO: Adicionar Elevador Parado -->
+                            <button class="btn btn-danger btn-sm" id="btnAdicionarElevadorParado">
+                                <i class="fas fa-plus"></i> Adicionar Elevador Parado
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Unidade/Cidade</th> <!-- Ajustado para corresponder ao JS -->
+                                            <th>Tipo</th>
+                                            <th>Empresa</th>
+                                            <th>Marca</th>
+                                            <th>Elevador (Desc/ID)</th> <!-- Ajustado para corresponder ao JS -->
+                                            <th>Data Parada</th>
+                                            <th>Previsão Retorno</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="elevadores-parados-tbody">
+                                        <!-- Preenchido via JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NOVO: Modal para Adicionar/Editar Elevador Parado -->
+            <div class="modal fade" id="modalGerenciarElevador" tabindex="-1" aria-labelledby="modalGerenciarElevadorLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="modalGerenciarElevadorLabel">Gerenciar Elevador Parado</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="formGerenciarElevador">
+                                <input type="hidden" id="form-id-elevador-unico" name="id_elevador_unico">
+                                
+                                <div class="mb-3">
+                                    <label for="form-cidade" class="form-label">Cidade</label>
+                                    <input type="text" class="form-control" id="form-cidade" name="cidade" required list="cidades-list">
+                                    <datalist id="cidades-list"></datalist>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="form-unidade" class="form-label">Unidade</label>
+                                    <input type="text" class="form-control" id="form-unidade" name="unidade" required list="unidades-list">
+                                    <datalist id="unidades-list"></datalist>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="form-endereco" class="form-label">Endereço</label>
+                                    <input type="text" class="form-control" id="form-endereco" name="endereco" required list="enderecos-list">
+                                    <datalist id="enderecos-list"></datalist>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="form-id-elevador" class="form-label">Número do Elevador / Descrição</label>
+                                    <input type="text" class="form-control" id="form-id-elevador" name="id_elevador" required list="elevadores-list">
+                                    <datalist id="elevadores-list"></datalist>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="form-data-parada" class="form-label">Data de Parada</label>
+                                    <input type="date" class="form-control" id="form-data-parada" name="data_de_parada">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="form-previsao-retorno" class="form-label">Previsão de Retorno</label>
+                                    <input type="date" class="form-control" id="form-previsao-retorno" name="previsao_de_retorno">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="form-status" class="form-label">Status</label>
+                                    <select class="form-select" id="form-status" name="status" required>
+                                        <option value="Em atividade">Em atividade</option>
+                                        <option value="Parado">Parado</option>
+                                        <option value="Suspenso">Suspenso</option>
+                                    </select>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-primary" id="btnSalvarElevador">Salvar</button>
                         </div>
                     </div>
                 </div>

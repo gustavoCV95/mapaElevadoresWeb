@@ -524,6 +524,7 @@ function atualizarElevadoresParadosTabela(elevadoresParadosList) {
                 <tr class="elevador-row-hover">
                     <td>${elevador.unidade} - ${elevador.cidade}</td>
                     <td>${elevador.tipo}</td>
+                    <td>${elevador.empresa}</td>
                     <td>${elevador.marca}</td>
                     <td>${elevador.descricao} (ID: ${elevador.id})</td>
                     <td style="text-align: center;">${elevador.DataDeParada || '-'}</td>
